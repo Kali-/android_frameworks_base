@@ -1048,6 +1048,8 @@ status_t OMXCodec::configureCodec(const sp<MetaData> &meta) {
         const void *data;
         size_t size;
 #ifdef QCOM_HARDWARE
+        const char *mime_type;
+
         if (!strncasecmp(mMIME, "video/", 6)) {
             int32_t arbitraryMode = 1;
             bool success = meta->findInt32(kKeyUseArbitraryMode, &arbitraryMode);
@@ -1065,8 +1067,16 @@ status_t OMXCodec::configureCodec(const sp<MetaData> &meta) {
             esds.getCodecSpecificInfo(
                     &codec_specific_data, &codec_specific_data_size);
 
+#ifdef QCOM_HARDWARE
+            meta->findCString(kKeyMIMEType, &mime_type);
+            if (strncmp(mime_type, MEDIA_MIMETYPE_AUDIO_MPEG, 10)) {
+                addCodecSpecificData(codec_specific_data,
+                        codec_specific_data_size);
+            }
+#else
             addCodecSpecificData(
                     codec_specific_data, codec_specific_data_size);
+#endif
         } else if (meta->findData(kKeyAVCC, &type, &data, &size)) {
             // Parse the AVCDecoderConfigurationRecord
 

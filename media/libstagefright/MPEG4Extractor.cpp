@@ -254,6 +254,11 @@ static const char *FourCC2MIME(uint32_t fourcc) {
         case FOURCC('m', 'p', '4', 'a'):
             return MEDIA_MIMETYPE_AUDIO_AAC;
 
+#ifdef QCOM_HARDWARE
+        case FOURCC('.', 'm', 'p', '3'):
+            return MEDIA_MIMETYPE_AUDIO_MPEG;
+#endif
+
         case FOURCC('s', 'a', 'm', 'r'):
             return MEDIA_MIMETYPE_AUDIO_AMR_NB;
 
@@ -1006,6 +1011,9 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
         }
 
         case FOURCC('m', 'p', '4', 'a'):
+#ifdef QCOM_HARDWARE
+        case FOURCC('.', 'm', 'p', '3'):
+#endif
         case FOURCC('s', 'a', 'm', 'r'):
         case FOURCC('s', 'a', 'w', 'b'):
 #ifdef QCOM_HARDWARE
@@ -1051,8 +1059,19 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             mLastTrack->meta->setInt32(kKeyChannelCount, num_channels);
             mLastTrack->meta->setInt32(kKeySampleRate, sample_rate);
 
+#ifdef QCOM_HARDWARE
+            off_t stop_offset = *offset + chunk_size;
+            if (!strcasecmp(MEDIA_MIMETYPE_AUDIO_MPEG,
+                        FourCC2MIME(chunk_type))) {
+               // ESD is not required in mp3
+               *offset = stop_offset;
+            } else {
+               *offset = data_offset + sizeof(buffer);
+            }
+#else
             off64_t stop_offset = *offset + chunk_size;
             *offset = data_offset + sizeof(buffer);
+#endif
             while (*offset < stop_offset) {
                 status_t err = parseChunk(offset, depth + 1);
                 if (err != OK) {
@@ -1882,6 +1901,15 @@ status_t MPEG4Extractor::updateAudioTrackInfoFromESDS_MPEG4Audio(
         return OK;
     }
 
+#ifdef QCOM_HARDWARE
+    if (objectTypeIndication  == 0x6b
+        || objectTypeIndication  == 0x69) {
+        // This is mpeg1/2 audio content, set mimetype to mpeg
+        mLastTrack->meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_MPEG);
+        LOGD("objectTypeIndication:0x%x, set mimetype to mpeg ",objectTypeIndication);
+        return OK;
+    }
+#else
     if (objectTypeIndication  == 0x6b) {
         // The media subtype is MP3 audio
         // Our software MP3 audio decoder may not be able to handle
@@ -1889,6 +1917,7 @@ status_t MPEG4Extractor::updateAudioTrackInfoFromESDS_MPEG4Audio(
         LOGE("MP3 track in MP4/3GPP file is not supported");
         return ERROR_UNSUPPORTED;
     }
+#endif
 
     const uint8_t *csd;
     size_t csd_size;
