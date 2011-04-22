@@ -1447,9 +1447,10 @@ status_t StagefrightRecorder::setupVideoEncoder(
 
     sp<MetaData> meta = cameraSource->getFormat();
 
-    int32_t width, height, stride, sliceHeight, colorFormat;
 #ifdef QCOM_HARDWARE
-    int32_t hfr;
+    int32_t width, height, stride, sliceHeight, colorFormat, hfr, is3D;
+#else
+    int32_t width, height, stride, sliceHeight, colorFormat;
 #endif
     CHECK(meta->findInt32(kKeyWidth, &width));
     CHECK(meta->findInt32(kKeyHeight, &height));
@@ -1553,6 +1554,11 @@ status_t StagefrightRecorder::setupVideoEncoder(
     if (mVideoEncoderLevel != -1) {
         enc_meta->setInt32(kKeyVideoLevel, mVideoEncoderLevel);
     }
+#ifdef QCOM_HARDWARE
+    if (meta->findInt32(kKey3D, &is3D)) {
+        enc_meta->setInt32(kKey3D, is3D);
+    }
+#endif
 
     OMXClient client;
     CHECK_EQ(client.connect(), OK);

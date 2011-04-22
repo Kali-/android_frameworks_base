@@ -256,6 +256,8 @@ private:
     List<int64_t> mDecodingTimeList;
 
 #ifdef QCOM_HARDWARE
+    bool m3DVideoDetected;
+
     //Used to indicate if the AAC container has ADIF format
     int32_t mIsAacFormatAdif;
 #endif
@@ -394,6 +396,8 @@ private:
             unsigned *profile, unsigned *level, const sp<MetaData> &meta);
 #ifdef QCOM_HARDWARE
     void parseFlags();
+
+    status_t processSEIData();
 #endif
 
     OMXCodec(const OMXCodec &);
