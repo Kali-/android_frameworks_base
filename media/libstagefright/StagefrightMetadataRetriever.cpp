@@ -667,6 +667,21 @@ void StagefrightMetadataRetriever::parseMetaData() {
                         METADATA_KEY_MIMETYPE, String8("audio/x-matroska"));
             }
         }
+
+#ifdef QCOM_HARDWARE
+        // Allow Audio only ASF clips to be considered as audio clips
+        if (!strcasecmp(fileMIME, "video/x-ms-asf") ||
+                !strcasecmp(fileMIME, "audio/x-ms-wma")) {
+            sp<MetaData> trackMeta = mExtractor->getTrackMetaData(0);
+            const char *trackMIME;
+            CHECK(trackMeta->findCString(kKeyMIMEType, &trackMIME));
+
+            if (!strcasecmp("audio/x-ms-wma", trackMIME)) {
+                mMetaData.add(
+                        METADATA_KEY_MIMETYPE, String8("audio/x-ms-wma"));
+            }
+        }
+#endif
     }
 
     // To check whether the media file is drm-protected
