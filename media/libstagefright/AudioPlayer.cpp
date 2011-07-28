@@ -103,6 +103,12 @@ status_t AudioPlayer::start(bool sourceAlreadyStarted) {
         CHECK(mFirstBuffer == NULL);
         mFirstBufferResult = OK;
         mIsFirstBuffer = false;
+#ifdef QCOM_HARDWARE
+    } else if(mFirstBufferResult != OK) {
+        mReachedEOS = true;
+        mFinalStatus = mFirstBufferResult;
+        return mFirstBufferResult;
+#endif
     } else {
         mIsFirstBuffer = true;
     }

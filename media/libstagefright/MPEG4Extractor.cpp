@@ -2260,6 +2260,13 @@ status_t MPEG4Source::read(
 
     if (!mIsAVC || mWantsNALFragments) {
         if (newBuffer) {
+#ifdef QCOM_HARDWARE
+            if (size > mBuffer->size()) {
+                mBuffer->release();
+                mBuffer = NULL;
+                return ERROR_IO;
+            }
+#endif
             ssize_t num_bytes_read =
                 mDataSource->readAt(offset, (uint8_t *)mBuffer->data(), size);
 
