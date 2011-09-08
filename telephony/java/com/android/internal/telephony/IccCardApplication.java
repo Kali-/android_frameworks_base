@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006 The Android Open Source Project
+ * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -91,6 +92,50 @@ public class IccCardApplication {
         boolean isPersoSubStateUnknown() {
             return this == PERSOSUBSTATE_UNKNOWN;
         }
+
+        boolean isPersoSubStateSimNetwork() {
+            return this == PERSOSUBSTATE_SIM_NETWORK;
+        }
+
+        boolean isPersoSubStateSimNetworkSubset() {
+            return this == PERSOSUBSTATE_SIM_NETWORK_SUBSET;
+        }
+
+        boolean isPersoSubStateSimCorporate() {
+            return this == PERSOSUBSTATE_SIM_CORPORATE;
+        }
+
+        boolean isPersoSubStateSimServiceProvider() {
+            return this == PERSOSUBSTATE_SIM_SERVICE_PROVIDER;
+        }
+
+        boolean isPersoSubStateSimSim() {
+            return this == PERSOSUBSTATE_SIM_SIM;
+        }
+
+        boolean isPersoSubStateRuimNetwork1() {
+            return this == PERSOSUBSTATE_RUIM_NETWORK1;
+        }
+
+        boolean isPersoSubStateRuimNetwork2() {
+            return this == PERSOSUBSTATE_RUIM_NETWORK2;
+        }
+
+        boolean isPersoSubStateRuimHrpd() {
+            return this == PERSOSUBSTATE_RUIM_HRPD;
+        }
+
+        boolean isPersoSubStateRuimCorporate() {
+            return this == PERSOSUBSTATE_RUIM_CORPORATE;
+        }
+
+        boolean isPersoSubStateRuimServiceProvider() {
+            return this == PERSOSUBSTATE_RUIM_SERVICE_PROVIDER;
+        }
+
+        boolean isPersoSubStateRuimRuim() {
+            return this == PERSOSUBSTATE_RUIM_RUIM;
+        }
     };
 
     public AppType        app_type;
@@ -115,7 +160,6 @@ public class IccCardApplication {
             case 2: newType = AppType.APPTYPE_USIM;    break;
             case 3: newType = AppType.APPTYPE_RUIM;    break;
             case 4: newType = AppType.APPTYPE_CSIM;    break;
-            case 5: newType = AppType.APPTYPE_USIM;    break;
             default:
                 throw new RuntimeException(
                             "Unrecognized RIL_AppType: " +type);

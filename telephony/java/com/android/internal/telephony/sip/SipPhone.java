@@ -41,7 +41,6 @@ import com.android.internal.telephony.UUSInfo;
 
 import java.text.ParseException;
 import java.util.List;
-import java.util.regex.Pattern;
 
 /**
  * {@hide}
@@ -372,7 +371,6 @@ public class SipPhone extends SipPhoneBase {
         public Phone getPhone() {
             return SipPhone.this;
         }
-
         @Override
         public List<Connection> getConnections() {
             synchronized (SipPhone.class) {
@@ -384,8 +382,8 @@ public class SipPhone extends SipPhoneBase {
         Connection dial(String originalNumber) throws SipException {
             String calleeSipUri = originalNumber;
             if (!calleeSipUri.contains("@")) {
-                String replaceStr = Pattern.quote(mProfile.getUserName() + "@");
-                calleeSipUri = mProfile.getUriString().replaceFirst(replaceStr,
+                calleeSipUri = mProfile.getUriString().replaceFirst(
+                        mProfile.getUserName() + "@",
                         calleeSipUri + "@");
             }
             try {
@@ -423,6 +421,11 @@ public class SipPhone extends SipPhoneBase {
                             + ": " + this + " on phone " + getPhone());
                 }
             }
+        }
+
+        public void
+        hangupAllCalls() throws CallStateException {
+            throw new CallStateException("hangupAllCalls: Unimplemented Action");
         }
 
         void initIncomingCall(SipAudioCall sipAudioCall, boolean makeCallWait) {

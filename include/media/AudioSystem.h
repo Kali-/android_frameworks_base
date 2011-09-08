@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (c) 2009-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -95,6 +96,8 @@ public:
         HE_AAC_V1           = 0x05000000,
         HE_AAC_V2           = 0x06000000,
         VORBIS              = 0x07000000,
+        EVRC                = 0x08000000,
+        QCELP               = 0x09000000,
         MAIN_FORMAT_MASK    = 0xFF000000,
         SUB_FORMAT_MASK     = 0x00FFFFFF,
         // Aliases
@@ -269,7 +272,6 @@ public:
         DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES = 0x100,
         DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER = 0x200,
         DEVICE_OUT_AUX_DIGITAL = 0x400,
-        DEVICE_OUT_HDMI = 0x2000,
 #ifdef HAVE_FM_RADIO
         DEVICE_OUT_FM = 0x800,
         DEVICE_OUT_FM_SPEAKER = 0x1000,
@@ -283,7 +285,7 @@ public:
                 DEVICE_OUT_WIRED_HEADPHONE | DEVICE_OUT_BLUETOOTH_SCO | DEVICE_OUT_BLUETOOTH_SCO_HEADSET |
 #endif
                 DEVICE_OUT_BLUETOOTH_SCO_CARKIT | DEVICE_OUT_BLUETOOTH_A2DP | DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES |
-                DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER | DEVICE_OUT_AUX_DIGITAL | DEVICE_OUT_HDMI | DEVICE_OUT_DEFAULT),
+                DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER | DEVICE_OUT_AUX_DIGITAL | DEVICE_OUT_DEFAULT),
         DEVICE_OUT_ALL_A2DP = (DEVICE_OUT_BLUETOOTH_A2DP | DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES |
                 DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER),
 
@@ -436,6 +438,7 @@ public:
     static bool isInputChannel(uint32_t channel);
     static bool isValidFormat(uint32_t format);
     static bool isLinearPCM(uint32_t format);
+    static bool isModeInCall();
 
 private:
 
@@ -479,6 +482,7 @@ private:
     static uint32_t gPrevInSamplingRate;
     static int gPrevInFormat;
     static int gPrevInChannelCount;
+    static int gPhoneState;
 
     static sp<IAudioPolicyService> gAudioPolicyService;
 

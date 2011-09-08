@@ -33,7 +33,7 @@ public class NetworkInfo implements Parcelable {
     String operatorAlphaLong;
     String operatorAlphaShort;
     String operatorNumeric;
-
+    String operatorRAT;
     State state = State.UNKNOWN;
 
 
@@ -57,6 +57,11 @@ public class NetworkInfo implements Parcelable {
         return state;
     }
 
+    public String
+    getOperatorRAT() {
+        return operatorRAT;
+    }
+
     NetworkInfo(String operatorAlphaLong,
                 String operatorAlphaShort,
                 String operatorNumeric,
@@ -65,17 +70,30 @@ public class NetworkInfo implements Parcelable {
         this.operatorAlphaLong = operatorAlphaLong;
         this.operatorAlphaShort = operatorAlphaShort;
         this.operatorNumeric = operatorNumeric;
-
         this.state = state;
+        this.operatorRAT = "";
+    }
+
+    NetworkInfo(String operatorAlphaLong,
+                String operatorAlphaShort,
+                String operatorNumeric,
+                State state, String operatorRAT) {
+
+        this.operatorAlphaLong = operatorAlphaLong;
+        this.operatorAlphaShort = operatorAlphaShort;
+        this.operatorNumeric = operatorNumeric;
+        this.state = state;
+        this.operatorRAT = operatorRAT;
     }
 
 
     public NetworkInfo(String operatorAlphaLong,
                 String operatorAlphaShort,
                 String operatorNumeric,
-                String stateString) {
+                String stateString,
+                String operatorRAT) {
         this (operatorAlphaLong, operatorAlphaShort,
-                operatorNumeric, rilStateToState(stateString));
+                operatorNumeric, rilStateToState(stateString), operatorRAT);
     }
 
     /**
@@ -125,6 +143,7 @@ public class NetworkInfo implements Parcelable {
         dest.writeString(operatorAlphaShort);
         dest.writeString(operatorNumeric);
         dest.writeSerializable(state);
+        dest.writeString(operatorRAT);
     }
 
     /**
@@ -138,7 +157,8 @@ public class NetworkInfo implements Parcelable {
                         in.readString(), /*operatorAlphaLong*/
                         in.readString(), /*operatorAlphaShort*/
                         in.readString(), /*operatorNumeric*/
-                        (State) in.readSerializable()); /*state*/
+                        (State) in.readSerializable(), /*state*/
+                        in.readString()); /*operatorRAT*/
                 return netInfo;
             }
 

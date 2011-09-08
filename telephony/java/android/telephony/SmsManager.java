@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +22,7 @@ import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.text.TextUtils;
 
+import com.android.internal.telephony.EncodeException;
 import com.android.internal.telephony.ISms;
 import com.android.internal.telephony.IccConstants;
 import com.android.internal.telephony.SmsRawData;
@@ -403,6 +405,36 @@ public final class SmsManager {
     }
 
     /**
+     * Enable reception of cdma broadcast messages with the given
+     * message identifier. Note that if two different clients enable the same
+     * message identifier, they must both disable it for the device to stop
+     * receiving those messages. All received messages will be broadcast in an
+     * intent with the action "android.provider.telephony.SMS_CDMA_BROADCAST_RECEIVED".
+     * Note: This call is blocking, callers may want to avoid calling it from
+     * the main thread of an application.
+     *
+     * @param messageIdentifier Message identifier as specified in C.R1001-G
+     * @return true if successful, false otherwise
+     * @see #disableCdmaBroadcast(int)
+     *
+     * {@hide}
+     */
+    public boolean enableCdmaBroadcast(int messageIdentifier) {
+        boolean success = false;
+
+        try {
+            ISms iccISms = ISms.Stub.asInterface(ServiceManager.getService("isms"));
+            if (iccISms != null) {
+                success = iccISms.enableCdmaBroadcast(messageIdentifier);
+            }
+        } catch (RemoteException ex) {
+            // ignore it
+        }
+
+        return success;
+    }
+
+    /**
      * Enable reception of cell broadcast (SMS-CB) messages with the given
      * message identifier range. Note that if two different clients enable the same
      * message identifier, they must both disable it for the device to stop
@@ -425,6 +457,36 @@ public final class SmsManager {
             ISms iccISms = ISms.Stub.asInterface(ServiceManager.getService("isms"));
             if (iccISms != null) {
                 success = iccISms.enableCellBroadcastRange(startMessageId, endMessageId);
+            }
+        } catch (RemoteException ex) {
+            // ignore it
+        }
+
+        return success;
+    }
+
+    /**
+     * Disable reception of cdma broadcast messages with the given
+     * message identifier. Note that if two different clients enable the same
+     * message identifier, they must both disable it for the device to stop
+     * receiving those messages.
+     * Note: This call is blocking, callers may want to avoid calling it from
+     * the main thread of an application.
+     *
+     * @param messageIdentifier Message identifier as specified in C.R1001-G
+     * @return true if successful, false otherwise
+     *
+     * @see #enableCdmaBroadcast(int)
+     *
+     * {@hide}
+     */
+    public boolean disableCdmaBroadcast(int messageIdentifier) {
+        boolean success = false;
+
+        try {
+            ISms iccISms = ISms.Stub.asInterface(ServiceManager.getService("isms"));
+            if (iccISms != null) {
+                success = iccISms.disableCdmaBroadcast(messageIdentifier);
             }
         } catch (RemoteException ex) {
             // ignore it

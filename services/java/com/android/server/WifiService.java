@@ -2443,6 +2443,9 @@ public class WifiService extends IWifiManager.Stub {
             // we want to over-report rather than under-report.
             sendReportWorkSourceMessage();
 
+            //update the state tracker with wifi locks state.
+            mWifiStateTracker.setHasWifiLocks(mLocks.hasLocks());
+
             updateWifiState();
             return true;
         } catch (RemoteException e) {

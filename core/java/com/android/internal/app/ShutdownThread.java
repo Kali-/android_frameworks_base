@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,8 +41,12 @@ import android.os.storage.IMountShutdownObserver;
 
 import com.android.internal.telephony.ITelephony;
 import android.util.Log;
-import android.view.KeyEvent;
 import android.view.WindowManager;
+
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.PrintWriter;
+import java.io.OutputStreamWriter;
 
 public final class ShutdownThread extends Thread {
     // constants
@@ -68,13 +73,19 @@ public final class ShutdownThread extends Thread {
     // static instance of this thread
     private static final ShutdownThread sInstance = new ShutdownThread();
     
+    // force sync modem file system before shutdown
+    private static final String SYSFS_MSM_EFS_SYNC_START = "/sys/devices/platform/rs300000a7.65536/force_sync";
+    private static final String SYSFS_MSM_EFS_SYNC_COMPLETE = "/sys/devices/platform/rs300000a7.65536/sync_sts";
+    private static final String SYSFS_MDM_EFS_SYNC_START = "/sys/devices/platform/rs300100a7.65536/force_sync";
+    private static final String SYSFS_MDM_EFS_SYNC_COMPLETE = "/sys/devices/platform/rs300100a7.65536/sync_sts";
+
     private final Object mActionDoneSync = new Object();
     private boolean mActionDone;
     private Context mContext;
     private PowerManager mPowerManager;
-    private PowerManager.WakeLock mCpuWakeLock;
-    private PowerManager.WakeLock mScreenWakeLock;
+    private PowerManager.WakeLock mWakeLock;
     private Handler mHandler;
+    private boolean mRilShutdown = SystemProperties.getBoolean("ro.ril.shutdown",false);
     
     private ShutdownThread() {
     }
@@ -97,61 +108,27 @@ public final class ShutdownThread extends Thread {
             }
         }
 
+        boolean isDebuggableMonkeyBuild =
+                                SystemProperties.getBoolean("ro.monkey", false);
+        if (isDebuggableMonkeyBuild) {
+            Log.d(TAG, "Rejected shutdown as monkey is detected to be running.");
+            return;
+        }
+
         Log.d(TAG, "Notifying thread to start radio shutdown");
 
         if (confirm) {
-            final AlertDialog dialog;
-            // Set different dialog message based on whether or not we're rebooting
-            if (mReboot) {
-                dialog = new AlertDialog.Builder(context)
-                        .setIcon(android.R.drawable.ic_dialog_alert)
-                        .setTitle(com.android.internal.R.string.reboot_system)
-                        .setSingleChoiceItems(com.android.internal.R.array.shutdown_reboot_options, 0, new DialogInterface.OnClickListener() {
-                            public void onClick(DialogInterface dialog, int which) {
-                                if (which < 0)
-                                    return;
-
-                                String actions[] = context.getResources().getStringArray(com.android.internal.R.array.shutdown_reboot_actions);
-
-                                if (actions != null && which < actions.length)
-                                    mRebootReason = actions[which];
-                            }
-                        })
-                        .setPositiveButton(com.android.internal.R.string.yes, new DialogInterface.OnClickListener() {
-                            public void onClick(DialogInterface dialog, int which) {
-                                mReboot = true;
-                                beginShutdownSequence(context);
-                            }
-                        })
-                        .setNegativeButton(com.android.internal.R.string.no, new DialogInterface.OnClickListener() {
-                            public void onClick(DialogInterface dialog, int which) {
-                                mReboot = false;
-                                dialog.cancel();
-                            }
-                        })
-                        .create();
-                        dialog.setOnKeyListener(new DialogInterface.OnKeyListener() {
-                            public boolean onKey (DialogInterface dialog, int keyCode, KeyEvent event) {
-                                if (keyCode == KeyEvent.KEYCODE_BACK) {
-                                    mReboot = false;
-                                    dialog.cancel();
-                                }
-                                return true;
-                            }
-                        });
-            } else {
-                dialog = new AlertDialog.Builder(context)
-                        .setIcon(android.R.drawable.ic_dialog_alert)
-                        .setTitle(com.android.internal.R.string.power_off)
-                        .setMessage(com.android.internal.R.string.shutdown_confirm)
-                        .setPositiveButton(com.android.internal.R.string.yes, new DialogInterface.OnClickListener() {
-                            public void onClick(DialogInterface dialog, int which) {
-                                beginShutdownSequence(context);
-                            }
-                        })
-                        .setNegativeButton(com.android.internal.R.string.no, null)
-                        .create();
-            }
+            final AlertDialog dialog = new AlertDialog.Builder(context)
+                    .setIcon(android.R.drawable.ic_dialog_alert)
+                    .setTitle(com.android.internal.R.string.power_off)
+                    .setMessage(com.android.internal.R.string.shutdown_confirm)
+                    .setPositiveButton(com.android.internal.R.string.yes, new DialogInterface.OnClickListener() {
+                        public void onClick(DialogInterface dialog, int which) {
+                            beginShutdownSequence(context);
+                        }
+                    })
+                    .setNegativeButton(com.android.internal.R.string.no, null)
+                    .create();
             dialog.getWindow().setType(WindowManager.LayoutParams.TYPE_KEYGUARD_DIALOG);
             if (!context.getResources().getBoolean(
                     com.android.internal.R.bool.config_sf_slowBlur)) {
@@ -190,13 +167,8 @@ public final class ShutdownThread extends Thread {
         // throw up an indeterminate system dialog to indicate radio is
         // shutting down.
         ProgressDialog pd = new ProgressDialog(context);
-        if (mReboot) {
-            pd.setTitle(context.getText(com.android.internal.R.string.reboot_system));
-            pd.setMessage(context.getText(com.android.internal.R.string.reboot_progress));
-        } else {
-            pd.setTitle(context.getText(com.android.internal.R.string.power_off));
-            pd.setMessage(context.getText(com.android.internal.R.string.shutdown_progress));
-        }
+        pd.setTitle(context.getText(com.android.internal.R.string.power_off));
+        pd.setMessage(context.getText(com.android.internal.R.string.shutdown_progress));
         pd.setIndeterminate(true);
         pd.setCancelable(false);
         pd.getWindow().setType(WindowManager.LayoutParams.TYPE_KEYGUARD_DIALOG);
@@ -207,36 +179,20 @@ public final class ShutdownThread extends Thread {
 
         pd.show();
 
+        // start the thread that initiates shutdown
         sInstance.mContext = context;
         sInstance.mPowerManager = (PowerManager)context.getSystemService(Context.POWER_SERVICE);
-
-        // make sure we never fall asleep again
-        sInstance.mCpuWakeLock = null;
-        try {
-            sInstance.mCpuWakeLock = sInstance.mPowerManager.newWakeLock(
-                    PowerManager.PARTIAL_WAKE_LOCK, TAG + "-cpu");
-            sInstance.mCpuWakeLock.setReferenceCounted(false);
-            sInstance.mCpuWakeLock.acquire();
-        } catch (SecurityException e) {
-            Log.w(TAG, "No permission to acquire wake lock", e);
-            sInstance.mCpuWakeLock = null;
-        }
-
-        // also make sure the screen stays on for better user experience
-        sInstance.mScreenWakeLock = null;
+        sInstance.mWakeLock = null;
         if (sInstance.mPowerManager.isScreenOn()) {
             try {
-                sInstance.mScreenWakeLock = sInstance.mPowerManager.newWakeLock(
-                        PowerManager.FULL_WAKE_LOCK, TAG + "-screen");
-                sInstance.mScreenWakeLock.setReferenceCounted(false);
-                sInstance.mScreenWakeLock.acquire();
+                sInstance.mWakeLock = sInstance.mPowerManager.newWakeLock(
+                        PowerManager.FULL_WAKE_LOCK, "Shutdown");
+                sInstance.mWakeLock.acquire();
             } catch (SecurityException e) {
                 Log.w(TAG, "No permission to acquire wake lock", e);
-                sInstance.mScreenWakeLock = null;
+                sInstance.mWakeLock = null;
             }
         }
-
-        // start the thread that initiates shutdown
         sInstance.mHandler = new Handler() {
         };
         sInstance.start();
@@ -256,6 +212,7 @@ public final class ShutdownThread extends Thread {
     public void run() {
         boolean bluetoothOff;
         boolean radioOff;
+        boolean msmEfsSyncDone, mdmEfsSyncDone;
 
         BroadcastReceiver br = new BroadcastReceiver() {
             @Override public void onReceive(Context context, Intent intent) {
@@ -316,7 +273,7 @@ public final class ShutdownThread extends Thread {
         final IMountService mount =
                 IMountService.Stub.asInterface(
                         ServiceManager.checkService("mount"));
-        
+
         try {
             bluetoothOff = bluetooth == null ||
                            bluetooth.getBluetoothState() == BluetoothAdapter.STATE_OFF;
@@ -340,9 +297,36 @@ public final class ShutdownThread extends Thread {
             radioOff = true;
         }
 
+        // Clean sync radio file system before shutdown
+        // Open the efs sync sysfs file for writing and write "1" to it.
+        PrintWriter outStream = null;
+        try {
+            msmEfsSyncDone = false;
+            FileOutputStream fos = new FileOutputStream(SYSFS_MSM_EFS_SYNC_START);
+            outStream = new PrintWriter(new OutputStreamWriter(fos));
+            outStream.println("1");
+        } catch (Exception e) {
+            msmEfsSyncDone = true;
+        } finally {
+            if (outStream != null)
+                outStream.close();
+        }
+
+        try {
+            mdmEfsSyncDone = false;
+            FileOutputStream fos = new FileOutputStream(SYSFS_MDM_EFS_SYNC_START);
+            outStream = new PrintWriter(new OutputStreamWriter(fos));
+            outStream.println("1");
+        } catch (Exception e) {
+            mdmEfsSyncDone = true;
+        } finally {
+            if (outStream != null)
+                outStream.close();
+        }
+
         Log.i(TAG, "Waiting for Bluetooth and Radio...");
-        
-        // Wait a max of 32 seconds for clean shutdown
+
+        // Wait a max of 8 seconds for clean shutdown
         for (int i = 0; i < MAX_NUM_PHONE_STATE_READS; i++) {
             if (!bluetoothOff) {
                 try {
@@ -361,7 +345,33 @@ public final class ShutdownThread extends Thread {
                     radioOff = true;
                 }
             }
-            if (radioOff && bluetoothOff) {
+            if (!msmEfsSyncDone) {
+                try {
+                    FileInputStream fis = new FileInputStream(SYSFS_MSM_EFS_SYNC_COMPLETE);
+                    int result = fis.read();
+                    fis.close();
+                    if (result == '1')
+					{
+                    	msmEfsSyncDone = true;
+					}
+                } catch (Exception ex) {
+                    msmEfsSyncDone = true;
+                }
+            }
+            if (!mdmEfsSyncDone) {
+                try {
+                    FileInputStream fis = new FileInputStream(SYSFS_MDM_EFS_SYNC_COMPLETE);
+                    int result = fis.read();
+                    fis.close();
+                    if (result == '1')
+					{
+                    	mdmEfsSyncDone = true;
+					}
+                } catch (Exception ex) {
+                    mdmEfsSyncDone = true;
+                }
+            }
+            if (radioOff && bluetoothOff && msmEfsSyncDone && mdmEfsSyncDone) {
                 Log.i(TAG, "Radio and Bluetooth shutdown complete.");
                 break;
             }

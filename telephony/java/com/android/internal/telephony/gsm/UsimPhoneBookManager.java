@@ -24,6 +24,7 @@ import android.util.Log;
 import com.android.internal.telephony.AdnRecord;
 import com.android.internal.telephony.AdnRecordCache;
 import com.android.internal.telephony.IccConstants;
+import com.android.internal.telephony.IccFileHandler;
 import com.android.internal.telephony.IccUtils;
 import com.android.internal.telephony.PhoneBase;
 
@@ -44,7 +45,7 @@ public class UsimPhoneBookManager extends Handler implements IccConstants {
     private static final boolean DBG = true;
     private PbrFile mPbrFile;
     private Boolean mIsPbrPresent;
-    private PhoneBase mPhone;
+    private IccFileHandler mFh;
     private AdnRecordCache mAdnCache;
     private Object mLock = new Object();
     private ArrayList<AdnRecord> mPhoneBookRecords;
@@ -53,7 +54,6 @@ public class UsimPhoneBookManager extends Handler implements IccConstants {
     private ArrayList<byte[]> mIapFileRecord;
     private ArrayList<byte[]> mEmailFileRecord;
     private Map<Integer, ArrayList<String>> mEmailsForAdnRec;
-    private boolean mRefreshCache = false;
 
     private static final int EVENT_PBR_LOAD_DONE = 1;
     private static final int EVENT_USIM_ADN_LOAD_DONE = 2;
@@ -76,8 +76,8 @@ public class UsimPhoneBookManager extends Handler implements IccConstants {
     private static final int USIM_EFEMAIL_TAG = 0xCA;
     private static final int USIM_EFCCP1_TAG  = 0xCB;
 
-    public UsimPhoneBookManager(PhoneBase phone, AdnRecordCache cache) {
-        mPhone = phone;
+    public UsimPhoneBookManager(IccFileHandler fh, AdnRecordCache cache) {
+        mFh = fh;
         mPhoneBookRecords = new ArrayList<AdnRecord>();
         mPbrFile = null;
         // We assume its present, after the first read this is updated.
@@ -92,19 +92,11 @@ public class UsimPhoneBookManager extends Handler implements IccConstants {
         mEmailFileRecord = null;
         mPbrFile = null;
         mIsPbrPresent = true;
-        mRefreshCache = false;
     }
 
     public ArrayList<AdnRecord> loadEfFilesFromUsim() {
         synchronized (mLock) {
-            if (!mPhoneBookRecords.isEmpty()) {
-                if (mRefreshCache) {
-                    mRefreshCache = false;
-                    refreshCache();
-                }
-                return mPhoneBookRecords;
-            }
-
+            if (!mPhoneBookRecords.isEmpty()) return mPhoneBookRecords;
             if (!mIsPbrPresent) return null;
 
             // Check if the PBR file is present in the cache, if not read it
@@ -125,22 +117,8 @@ public class UsimPhoneBookManager extends Handler implements IccConstants {
         return mPhoneBookRecords;
     }
 
-    private void refreshCache() {
-        if (mPbrFile == null) return;
-        mPhoneBookRecords.clear();
-
-        int numRecs = mPbrFile.mFileIds.size();
-        for (int i = 0; i < numRecs; i++) {
-            readAdnFileAndWait(i);
-        }
-    }
-
-    public void invalidateCache() {
-        mRefreshCache = true;
-    }
-
     private void readPbrFileAndWait() {
-        mPhone.getIccFileHandler().loadEFLinearFixedAll(EF_PBR, obtainMessage(EVENT_PBR_LOAD_DONE));
+        mFh.loadEFLinearFixedAll(EF_PBR, obtainMessage(EVENT_PBR_LOAD_DONE));
         try {
             mLock.wait();
         } catch (InterruptedException e) {
@@ -167,7 +145,7 @@ public class UsimPhoneBookManager extends Handler implements IccConstants {
                 }
             }
             // Read the EFEmail file.
-            mPhone.getIccFileHandler().loadEFLinearFixedAll(fileIds.get(USIM_EFEMAIL_TAG),
+            mFh.loadEFLinearFixedAll(fileIds.get(USIM_EFEMAIL_TAG),
                     obtainMessage(EVENT_EMAIL_LOAD_DONE));
             try {
                 mLock.wait();
@@ -185,7 +163,7 @@ public class UsimPhoneBookManager extends Handler implements IccConstants {
     }
 
     private void readIapFileAndWait(int efid) {
-        mPhone.getIccFileHandler().loadEFLinearFixedAll(efid, obtainMessage(EVENT_IAP_LOAD_DONE));
+        mFh.loadEFLinearFixedAll(efid, obtainMessage(EVENT_IAP_LOAD_DONE));
         try {
             mLock.wait();
         } catch (InterruptedException e) {

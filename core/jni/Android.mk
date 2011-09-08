@@ -142,7 +142,7 @@ LOCAL_SRC_FILES:= \
 	android_backup_FileBackupHelperBase.cpp \
 	android_backup_BackupHelperDispatcher.cpp \
 	android_content_res_ObbScanner.cpp \
-    android_content_res_Configuration.cpp
+	android_content_res_Configuration.cpp
 
 ifeq ($(BOARD_HAVE_FM_RADIO),true)
     ifeq ($(BOARD_FM_DEVICE),)

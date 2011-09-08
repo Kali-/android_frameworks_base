@@ -78,6 +78,7 @@ public final class CallManager {
     private static final int EVENT_SUPP_SERVICE_FAILED = 117;
     private static final int EVENT_SERVICE_STATE_CHANGED = 118;
     private static final int EVENT_POST_DIAL_CHARACTER = 119;
+    private static final int EVENT_SUPP_SERVICE_NOTIFY = 120;
 
     // Singleton instance
     private static final CallManager INSTANCE = new CallManager();
@@ -100,7 +101,6 @@ public final class CallManager {
     // default phone as the first phone registered, which is PhoneBase obj
     private Phone mDefaultPhone;
 
-    private boolean acceptingRingingCall;
     // state registrants
     protected final RegistrantList mPreciseCallStateRegistrants
     = new RegistrantList();
@@ -159,6 +159,9 @@ public final class CallManager {
     protected final RegistrantList mSuppServiceFailedRegistrants
     = new RegistrantList();
 
+    protected final RegistrantList mSuppServiceNotificationRegistrants
+    = new RegistrantList();
+
     protected final RegistrantList mServiceStateChangedRegistrants
     = new RegistrantList();
 
@@ -171,7 +174,6 @@ public final class CallManager {
         mBackgroundCalls = new ArrayList<Call>();
         mForegroundCalls = new ArrayList<Call>();
         mDefaultPhone = null;
-        acceptingRingingCall = false;
     }
 
     /**
@@ -378,26 +380,29 @@ public final class CallManager {
         int mode = AudioManager.MODE_NORMAL;
         switch (getState()) {
             case RINGING:
-                if (acceptingRingingCall) {
-                  mode = AudioManager.MODE_IN_CALL;
-                  acceptingRingingCall = false;
-                } else {
-                  mode = AudioManager.MODE_RINGTONE;
-                }
+                mode = AudioManager.MODE_RINGTONE;
                 break;
             case OFFHOOK:
                 Phone fgPhone = getFgPhone();
-                // While foreground call is in DIALING,
-                // ALERTING, ACTIVE and DISCONNECTING state
-                if (getActiveFgCallState() != Call.State.IDLE
-                        && getActiveFgCallState() != Call.State.DISCONNECTED) {
-                    if (fgPhone instanceof SipPhone) {
+                /*
+                 * While foreground call is in DIALING, ALERTING, ACTIVE and
+                 * DISCONNECTING state for SipPhone
+                 */
+                if (fgPhone instanceof SipPhone) {
+                    if (getActiveFgCallState() != Call.State.IDLE
+                            && getActiveFgCallState() != Call.State.DISCONNECTED) {
                         // enable IN_COMMUNICATION audio mode for sipPhone
                         mode = AudioManager.MODE_IN_COMMUNICATION;
-                    } else {
-                        // enable IN_CALL audio mode for telephony
-                        mode = AudioManager.MODE_IN_CALL;
                     }
+                } else {
+                    /*
+                     * Enable IN_CALL if Foreground or background call is in
+                     * DIALING, ALERTING, ACTIVE, HOLDING or DISCONNECTING
+                     * state. This means an active foreground call with/without
+                     * a background call or an idle foreground with a background
+                     * held call.
+                     */
+                    mode = AudioManager.MODE_IN_CALL;
                 }
                 break;
         }
@@ -428,6 +433,9 @@ public final class CallManager {
         phone.registerForMmiComplete(mHandler, EVENT_MMI_COMPLETE, null);
         phone.registerForSuppServiceFailed(mHandler, EVENT_SUPP_SERVICE_FAILED, null);
         phone.registerForServiceStateChanged(mHandler, EVENT_SERVICE_STATE_CHANGED, null);
+        if (phone.getPhoneType() == Phone.PHONE_TYPE_GSM) {
+            phone.registerForSuppServiceNotification(mHandler, EVENT_SUPP_SERVICE_NOTIFY, null);
+        }
 
         // for events supported only by GSM and CDMA phone
         if (phone.getPhoneType() == Phone.PHONE_TYPE_GSM ||
@@ -460,6 +468,7 @@ public final class CallManager {
         phone.unregisterForMmiInitiate(mHandler);
         phone.unregisterForMmiComplete(mHandler);
         phone.unregisterForSuppServiceFailed(mHandler);
+        phone.unregisterForSuppServiceNotification(mHandler);
         phone.unregisterForServiceStateChanged(mHandler);
 
         // for events supported only by GSM and CDMA phone
@@ -517,7 +526,6 @@ public final class CallManager {
         }
 
         ringingPhone.acceptCall();
-        acceptingRingingCall = true;
 
         if (VDBG) {
             Log.d(LOG_TAG, "End acceptCall(" +ringingCall + ")");
@@ -1268,6 +1276,27 @@ public final class CallManager {
     }
 
     /**
+     * Register for supplementary service notifications.
+     * Message.obj will contain an AsyncResult.
+     *
+     * @param h Handler that receives the notification message.
+     * @param what User-defined message code.
+     * @param obj User object.
+     */
+    public void registerForSuppServiceNotification(Handler h, int what, Object obj){
+        mSuppServiceNotificationRegistrants.addUnique(h, what, obj);
+    }
+
+    /**
+     * Unregister for supplementary service notifications.
+     *
+     * @param h Handler to be removed from the registrant list.
+     */
+    public void unregisterForSuppServiceNotification(Handler h){
+        mSuppServiceNotificationRegistrants.remove(h);
+    }
+
+    /**
      * Register for notifications when a sInCall VoicePrivacy is enabled
      *
      * @param h Handler that receives the notification message.
@@ -1775,6 +1804,10 @@ public final class CallManager {
                 case EVENT_SUPP_SERVICE_FAILED:
                     if (VDBG) Log.d(LOG_TAG, " handleMessage (EVENT_SUPP_SERVICE_FAILED)");
                     mSuppServiceFailedRegistrants.notifyRegistrants((AsyncResult) msg.obj);
+                    break;
+                case EVENT_SUPP_SERVICE_NOTIFY:
+                    if (VDBG) Log.d(LOG_TAG, " handleMessage (EVENT_SUPP_SERVICE_NOTIFICATION)");
+                    mSuppServiceNotificationRegistrants.notifyRegistrants((AsyncResult) msg.obj);
                     break;
                 case EVENT_SERVICE_STATE_CHANGED:
                     if (VDBG) Log.d(LOG_TAG, " handleMessage (EVENT_SERVICE_STATE_CHANGED)");
