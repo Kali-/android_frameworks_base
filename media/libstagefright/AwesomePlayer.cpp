@@ -69,8 +69,16 @@ namespace android {
 
 static int64_t kLowWaterMarkUs = 2000000ll;  // 2secs
 static int64_t kHighWaterMarkUs = 5000000ll;  // 5secs
+#ifndef QCOM_HARDWARE
+static int64_t kHighWaterMarkRTSPUs = 4000000ll;  // 4secs
+#endif
 static const size_t kLowWaterMarkBytes = 40000;
 static const size_t kHighWaterMarkBytes = 200000;
+#ifdef QCOM_HARDWARE
+static int64_t kVideoEarlyMarginUs = -10000LL;   //50 ms
+static int64_t kVideoLateMarginUs = 40000LL;  //200 ms
+static int64_t kVideoTooLateMarginUs = 500000LL;
+#endif
 
 struct AwesomeEvent : public TimedEventQueue::Event {
     AwesomeEvent(
@@ -1908,7 +1916,11 @@ void AwesomePlayer::onVideoEvent() {
             return;
         }
 
+#ifdef QCOM_HARDWARE
+        if (latenessUs > kVideoLateMarginUs) {
+#else
         if (latenessUs > 40000) {
+#endif
             // We're more than 40ms late.
             LOGV("we're late by %lld us (%.2f secs)",
                  latenessUs, latenessUs / 1E6);
@@ -1942,7 +1954,11 @@ void AwesomePlayer::onVideoEvent() {
             }
         }
 
+#ifdef QCOM_HARDWARE
+        if (latenessUs < kVideoEarlyMarginUs) {
+#else
         if (latenessUs < -10000) {
+#endif
             // We're more than 10ms early.
             logOnTime(timeUs,nowUs,latenessUs);
             {
