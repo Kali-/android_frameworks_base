@@ -1617,6 +1617,12 @@ void OMXCodec::setVideoInputFormat(
     int32_t width, height, frameRate, bitRate, stride, sliceHeight;
 #ifdef QCOM_HARDWARE
     int32_t hfr = 0, hfrRatio = 0;
+
+    char value[PROPERTY_VALUE_MAX];
+    if ( property_get("encoder.video.bitrate", value, 0) > 0 && atoi(value) > 0){
+        LOGV("Setting bit rate to %d", atoi(value));
+        meta->setInt32(kKeyBitRate, atoi(value));
+    }
 #endif
     bool success = meta->findInt32(kKeyWidth, &width);
     success = success && meta->findInt32(kKeyHeight, &height);
