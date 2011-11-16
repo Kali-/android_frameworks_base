@@ -1835,6 +1835,16 @@ void AwesomePlayer::onVideoEvent() {
     {
         Mutex::Autolock autoLock(mMiscStateLock);
         mVideoTimeUs = timeUs;
+
+#ifdef QCOM_HARDWARE
+        int64_t decodingTime = timeUs;
+        int64_t mEditTime = 0;
+        mVideoTrack->getFormat( )->findInt64( kKeyEditOffset, &mEditTime );
+        decodingTime += mEditTime;
+        timeUs = decodingTime;
+
+        mVideoTimeUs = timeUs;
+#endif
     }
 
     SeekType wasSeeking = mSeeking;

@@ -116,6 +116,10 @@ enum {
 
     kKeyValidSamples      = 'valD',  // int32_t
 
+#ifdef QCOM_HARDWARE
+    kKeyEditOffset        = 'edof',  // bool (int64_t)
+#endif
+
     kKeyIsUnreadable      = 'unre',  // bool (int32_t)
 #ifdef QCOM_HARDWARE
     kKeyRawCodecSpecificData = 'rcsd',  // raw data - added to support mmParser
