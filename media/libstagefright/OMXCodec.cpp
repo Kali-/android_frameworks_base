@@ -1040,7 +1040,7 @@ status_t OMXCodec::parseAVCCodecSpecificData(
 }
 
 status_t OMXCodec::configureCodec(const sp<MetaData> &meta) {
-    LOGV("configureCodec protected=%d",
+    LOGD("configureCodec protected=%d",
          (mFlags & kEnableGrallocUsageProtected) ? 1 : 0);
 
     if (!(mFlags & kIgnoreCodecSpecificData)) {
@@ -1157,7 +1157,23 @@ status_t OMXCodec::configureCodec(const sp<MetaData> &meta) {
         CHECK(meta->findInt32(kKeyChannelCount, &numChannels));
         CHECK(meta->findInt32(kKeySampleRate, &sampleRate));
 
+#ifdef QCOM_HARDWARE
+        meta->findInt32(kKeyBitRate, &bitRate);
+        meta->findInt32(kkeyAacFormatAdif, &mIsAacFormatAdif);
+#endif
         status_t err = setAACFormat(numChannels, sampleRate, bitRate);
+
+#ifdef QCOM_HARDWARE
+        uint32_t type;
+        const void *data;
+        size_t size;
+
+        if (meta->findData(kKeyAacCodecSpecificData, &type, &data, &size)) {
+            LOGV("OMXCodec:: configureCodec found kKeyAacCodecSpecificData of size %d\n", size);
+            addCodecSpecificData(data, size);
+        }
+#endif
+
         if (err != OK) {
             CODEC_LOGE("setAACFormat() failed (err = %d)", err);
             return err;
@@ -2254,6 +2270,7 @@ OMXCodec::OMXCodec(
       mPaused(false),
 #ifdef QCOM_HARDWARE
       bInvalidState(false),
+      mIsAacFormatAdif(0),
       mInterlaceFormatDetected(false),
       mSPSParsed(false),
       latenessUs(0),

@@ -58,6 +58,16 @@ private:
 
     bool mSignalledError;
 
+#ifdef QCOM_HARDWARE
+    int32_t mAACStreamFormat;
+
+    // Temporary buffer to store incomplete frame buffers
+    uint8_t* mTempInputBuffer;        // data ptr
+    uint32_t mTempBufferTotalSize;    // total size allocated
+    uint32_t mTempBufferDataLen;      // actual data length
+    uint32_t mInputBufferSize;         // input data length
+#endif
+
     enum {
         NONE,
         AWAITING_DISABLED,

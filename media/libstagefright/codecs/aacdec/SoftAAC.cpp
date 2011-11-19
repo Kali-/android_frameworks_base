@@ -48,6 +48,13 @@ SoftAAC::SoftAAC(
       mAnchorTimeUs(0),
       mNumSamplesOutput(0),
       mSignalledError(false),
+#ifdef QCOM_HARDWARE
+      mTempBufferDataLen(0),
+      mTempBufferTotalSize(0),
+      mTempInputBuffer(0),
+      mInputBufferSize(0),
+      mAACStreamFormat(-1),
+#endif
       mOutputPortSettingsChange(NONE) {
     initPorts();
     CHECK_EQ(initDecoder(), (status_t)OK);
@@ -59,6 +66,14 @@ SoftAAC::~SoftAAC() {
 
     delete mConfig;
     mConfig = NULL;
+
+#ifdef QCOM_HARDWARE
+    //Reset temp buffer
+    if( mTempInputBuffer != NULL ) {
+       free(mTempInputBuffer);
+       mTempInputBuffer = NULL;
+    }
+#endif
 }
 
 void SoftAAC::initPorts() {
@@ -215,6 +230,11 @@ OMX_ERRORTYPE SoftAAC::internalSetParameter(
                 return OMX_ErrorUndefined;
             }
 
+#ifdef QCOM_HARDWARE
+            mAACStreamFormat = aacParams->eAACStreamFormat;
+            LOGD(" mIsAacFormatAdif = %d ",mAACStreamFormat);
+#endif
+
             return OMX_ErrorNone;
         }
 
@@ -228,6 +248,9 @@ bool SoftAAC::isConfigured() const {
 }
 
 void SoftAAC::onQueueFilled(OMX_U32 portIndex) {
+#ifdef QCOM_HARDWARE
+    static bool checkFragment = false;
+#endif
     if (mSignalledError || mOutputPortSettingsChange != NONE) {
         return;
     }
@@ -261,6 +284,11 @@ void SoftAAC::onQueueFilled(OMX_U32 portIndex) {
         return;
     }
 
+#ifdef QCOM_HARDWARE
+    uint8_t* inputBuffer = NULL;
+    uint32_t inputBufferSize = 0;
+#endif
+
     while (!inQueue.empty() && !outQueue.empty()) {
         BufferInfo *inInfo = *inQueue.begin();
         OMX_BUFFERHEADERTYPE *inHeader = inInfo->mHeader;
@@ -279,6 +307,14 @@ void SoftAAC::onQueueFilled(OMX_U32 portIndex) {
             outQueue.erase(outQueue.begin());
             outInfo->mOwnedByUs = false;
             notifyFillBufferDone(outHeader);
+
+#ifdef QCOM_HARDWARE
+            //Reset temp buffer
+            if( mTempInputBuffer != NULL ) {
+               free(mTempInputBuffer);
+               mTempInputBuffer = NULL;
+            }
+#endif
             return;
         }
 
@@ -287,8 +323,54 @@ void SoftAAC::onQueueFilled(OMX_U32 portIndex) {
             mNumSamplesOutput = 0;
         }
 
+#ifdef QCOM_HARDWARE
+        inputBuffer = inHeader->pBuffer + inHeader->nOffset;
+        inputBufferSize = inHeader->nFilledLen;
+
+
+        if ( mInputBufferSize == 0 ) {
+            // Remember the first input buffer size
+            mInputBufferSize = inHeader->nFilledLen;
+        }
+
+        //Check if there was incomplete frame assembly started
+        if (checkFragment && mTempBufferDataLen ) {
+            LOGV("Incomplete frame assembly is in progress mTempBufferDataLen %d", mTempBufferDataLen);
+            LOGV("mTempBufferDataLen(%d) inputBufferSize(%d) mTempBufferTotalSize(%d)",
+                                         mTempBufferDataLen,inputBufferSize,mTempBufferTotalSize);
+
+            if ( mTempBufferDataLen + inputBufferSize > mTempBufferTotalSize ) {
+                LOGD("Temp buffer size exceeded %d input size %d", mTempBufferTotalSize, inputBufferSize);
+                notify(OMX_EventError, OMX_ErrorUndefined, UNKNOWN_ERROR, NULL);
+                return;
+            }
+            //append new input buffer to temp buffer
+            memcpy( mTempInputBuffer + mTempBufferDataLen, inputBuffer, inputBufferSize );
+
+            //update the new input buffer data
+            if ( inputBufferSize + mTempBufferDataLen < mInputBufferSize ) {
+                LOGV("Reached end of stream case" );
+                inputBufferSize += mTempBufferDataLen;
+                mTempBufferDataLen = 0;
+                mInputBufferSize = inputBufferSize;
+                // Watch for this issue, not very sure if needed
+                inHeader->nFilledLen = inputBufferSize;
+            }
+            memcpy( inputBuffer, mTempInputBuffer, inputBufferSize);
+            checkFragment = false;
+        }
+
+
+        //Get the input buffer
+        LOGD(" Input Buffer Length %d Offset %d size %d", inHeader->nFilledLen,  inHeader->nOffset, mInputBufferSize);
+
+        mConfig->pInputBuffer = inputBuffer;
+        mConfig->inputBufferCurrentLength = inputBufferSize;
+#else
         mConfig->pInputBuffer = inHeader->pBuffer + inHeader->nOffset;
         mConfig->inputBufferCurrentLength = inHeader->nFilledLen;
+#endif
+
         mConfig->inputBufferMaxLength = 0;
         mConfig->inputBufferUsedLength = 0;
         mConfig->remainderBits = 0;
@@ -361,19 +443,103 @@ void SoftAAC::onQueueFilled(OMX_U32 portIndex) {
         size_t numOutBytes =
             mConfig->frameLength * sizeof(int16_t) * mConfig->desiredChannels;
 
+#ifdef QCOM_HARDWARE
+        if( (decoderErr == MP4AUDEC_INCOMPLETE_FRAME)  &&
+            (mAACStreamFormat == OMX_AUDIO_AACStreamFormatADIF)) {
+            LOGD("Handle Incomplete frame error inputBufSize %d, usedLength %d",
+                  inputBufferSize, mConfig->inputBufferUsedLength);
+
+            if(mConfig->inputBufferUsedLength == mInputBufferSize){
+                LOGW("Decoder cannot process the buffer due to invalid frame");
+                decoderErr = MP4AUDEC_INVALID_FRAME;
+            }else {
+                if( !mTempInputBuffer ) {
+                    //Allocate Temp buffer
+                    uint32_t bytesToAllocate = 2 * mInputBufferSize;
+                    mTempInputBuffer = (uint8_t*)malloc( bytesToAllocate );
+                    mTempBufferDataLen = 0;
+                    if (mTempInputBuffer == NULL) {
+                        LOGE("Could not allocate temp buffer bytesToAllocate quit playing");
+                              notify(OMX_EventError, OMX_ErrorUndefined, UNKNOWN_ERROR, NULL);
+                        return ;
+                    }
+                    mTempBufferTotalSize = bytesToAllocate;
+                    LOGV("Allocated tempBuffer of size %d data len %d",
+                          mTempBufferTotalSize, mTempBufferDataLen);
+                }
+
+                // copy the remaining data into temp buffer
+                memcpy( mTempInputBuffer, inputBuffer, mConfig->inputBufferUsedLength );
+
+                if (mTempBufferDataLen != 0) {
+                    //append previous remaining data back into temp buffer
+                    LOGV("Appending remaining data tempDataLen %d usedLength %d",
+                          mTempBufferDataLen, mConfig->inputBufferUsedLength);
+                    memcpy( mTempInputBuffer + mConfig->inputBufferUsedLength,
+                            mTempInputBuffer + mInputBufferSize,
+                            mTempBufferDataLen );
+                }
+
+                mTempBufferDataLen += mConfig->inputBufferUsedLength;
+                LOGV("mTempBufferDataLen %d inputBufferUsedLength %d ",
+                     mTempBufferDataLen, mConfig->inputBufferUsedLength);
+
+                // temp buffer has accumulated one frame size worth data
+                // copy it back to input buffer so that it is fed to decoder next
+                if ( mTempBufferDataLen >= mInputBufferSize ) {
+                    LOGV("mTempBufferDataLen %d exceeded mInputBufferSize %d ",
+                          mTempBufferDataLen, mInputBufferSize);
+
+                    memcpy((UChar*)(inHeader->pBuffer), mTempInputBuffer, mInputBufferSize );
+                    mTempBufferDataLen -= mInputBufferSize;
+                    inHeader->nFilledLen = mInputBufferSize;
+                    mConfig->inputBufferUsedLength = 0;
+                }
+                checkFragment = true;
+                //reset the output buffer size
+                numOutBytes = 0;
+            }
+        }
+
+
+        if ((decoderErr == MP4AUDEC_SUCCESS)|| (decoderErr == MP4AUDEC_INCOMPLETE_FRAME)) {
+#else
         if (decoderErr == MP4AUDEC_SUCCESS) {
+#endif
             CHECK_LE(mConfig->inputBufferUsedLength, inHeader->nFilledLen);
 
             inHeader->nFilledLen -= mConfig->inputBufferUsedLength;
             inHeader->nOffset += mConfig->inputBufferUsedLength;
+
+#ifdef QCOM_HARDWARE
+            if((decoderErr == MP4AUDEC_SUCCESS) &&(inHeader->nFilledLen == 0) &&
+                mTempBufferDataLen) {
+                //put previous remaining data to temp buffer beginning
+                memcpy( mTempInputBuffer,
+                        mTempInputBuffer + mInputBufferSize,
+                        mTempBufferDataLen );
+            }
+        } else if(decoderErr != MP4AUDEC_SUCCESS && decoderErr != MP4AUDEC_INCOMPLETE_FRAME) {
+            LOGW(" AAC decoder returned error %d, substituting silence",
+#else
         } else {
             LOGW("AAC decoder returned error %d, substituting silence",
+#endif
                  decoderErr);
 
             memset(outHeader->pBuffer + outHeader->nOffset, 0, numOutBytes);
 
             // Discard input buffer.
             inHeader->nFilledLen = 0;
+
+#ifdef QCOM_HARDWARE
+            if(mTempBufferDataLen) {
+                //put previous remaining data to temp buffer beginning
+                memcpy( mTempInputBuffer,
+                        mTempInputBuffer + mInputBufferSize,
+                        mTempBufferDataLen );
+            }
+#endif
 
             // fall through
         }
@@ -408,7 +574,11 @@ void SoftAAC::onQueueFilled(OMX_U32 portIndex) {
             outHeader = NULL;
         }
 
+#ifdef QCOM_HARDWARE
+        if (inHeader != NULL && inHeader->nFilledLen == 0) {
+#else
         if (inHeader->nFilledLen == 0) {
+#endif
             inInfo->mOwnedByUs = false;
             inQueue.erase(inQueue.begin());
             inInfo = NULL;
