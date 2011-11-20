@@ -259,6 +259,9 @@ static const CodecInfo kDecoderInfo[] = {
 //    { MEDIA_MIMETYPE_AUDIO_AMR_NB, "OMX.Nvidia.amrwb.decoder" },
     { MEDIA_MIMETYPE_AUDIO_AMR_WB, "OMX.TI.WBAMR.decode" },
     { MEDIA_MIMETYPE_AUDIO_AMR_WB, "OMX.google.amrwb.decoder" },
+#if defined(QCOM_HARDWARE) && defined(USE_AAC_HW_DEC)
+    { MEDIA_MIMETYPE_AUDIO_AAC, "OMX.qcom.audio.decoder.aac" },
+#endif
 //    { MEDIA_MIMETYPE_AUDIO_AAC, "OMX.Nvidia.aac.decoder" },
     { MEDIA_MIMETYPE_AUDIO_AAC, "OMX.TI.AAC.decode" },
     { MEDIA_MIMETYPE_AUDIO_AAC, "OMX.google.aac.decoder" },
@@ -553,6 +556,12 @@ uint32_t OMXCodec::getComponentQuirks(
         quirks |= kSupportsMultipleFramesPerInputBuffer;
     }
 #ifdef QCOM_HARDWARE
+#ifdef USE_AAC_HW_DEC
+    if (!strcmp(componentName, "OMX.qcom.audio.decoder.aac")) {
+        quirks |= kRequiresAllocateBufferOnInputPorts;
+        quirks |= kRequiresAllocateBufferOnOutputPorts;
+    }
+#endif
     if (!strcmp(componentName, "OMX.qcom.audio.encoder.evrc")) {
         quirks |= kRequiresAllocateBufferOnInputPorts;
         quirks |= kRequiresAllocateBufferOnOutputPorts;
@@ -796,8 +805,19 @@ sp<MediaSource> OMXCodec::Create(
               componentName= "OMX.qcom.audio.decoder.wmaLossLess";
            }
         }
-#endif
+#if USE_AAC_HW_DEC
+        int aacformattype = 0;
+        int aacLTPType = 0;
+        sp<MetaData> metadata = source->getFormat();
+        metadata->findInt32(kkeyAacFormatAdif, &aacformattype);
+        metadata->findInt32(kkeyAacFormatLtp, &aacLTPType);
 
+        if ((aacformattype == true)|| aacLTPType == true)  {
+            LOGE("This is ADIF/LTP clip , so using sw decoder ");
+            componentName= "OMX.google.aac.decoder";
+        }
+#endif
+#endif
         if (!createEncoder
                 && (quirks & kOutputBuffersAreUnreadable)
                 && (flags & kClientNeedsFramebuffer)) {
@@ -4680,7 +4700,16 @@ status_t OMXCodec::setAACFormat(int32_t numChannels, int32_t sampleRate, int32_t
 
         profile.nChannels = numChannels;
         profile.nSampleRate = sampleRate;
+
+#ifdef QCOM_HARDWARE
+        if(mIsAacFormatAdif){
+            profile.eAACStreamFormat = OMX_AUDIO_AACStreamFormatADIF;
+        }else{
+            profile.eAACStreamFormat = OMX_AUDIO_AACStreamFormatMP4ADTS;
+        }
+#else
         profile.eAACStreamFormat = OMX_AUDIO_AACStreamFormatMP4ADTS;
+#endif
 
         err = mOMX->setParameter(
                 mNode, OMX_IndexParamAudioAac, &profile, sizeof(profile));
