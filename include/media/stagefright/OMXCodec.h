@@ -288,6 +288,9 @@ private:
     status_t setupErrorCorrectionParameters();
     status_t setupH263EncoderParameters(const sp<MetaData>& meta);
     status_t setupMPEG4EncoderParameters(const sp<MetaData>& meta);
+#ifdef QCOM_HARDWARE
+    status_t setupMPEG2EncoderParameters(const sp<MetaData>& meta);
+#endif
     status_t setupAVCEncoderParameters(const sp<MetaData>& meta);
     status_t findTargetColorFormat(
             const sp<MetaData>& meta, OMX_COLOR_FORMATTYPE *colorFormat);
