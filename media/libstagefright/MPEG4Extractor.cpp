@@ -39,6 +39,10 @@
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/Utils.h>
 #include <utils/String8.h>
+#ifdef QCOM_HARDWARE
+#include <utils/List.h>
+#endif
+
 #include <cutils/properties.h>
 
 namespace android {
@@ -89,6 +93,10 @@ private:
     bool mStatistics;
     void logExpectedFrames();
     void logTrackStatistics();
+
+#ifdef QCOM_HARDWARE
+    uint32_t mCurrentSampleDescIndex;
+#endif
 
     size_t parseNALSize(const uint8_t *data) const;
 
@@ -684,6 +692,10 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
         return OK;
     }
 
+#ifdef QCOM_HARDWARE
+    LOGV("parsing chunk %c%c%c%c at depth %d", ((char *)&chunk_type)[3], ((char *)&chunk_type)[2], ((char *)&chunk_type)[1], ((char *)&chunk_type)[0], depth);
+#endif
+
     switch(chunk_type) {
         case FOURCC('m', 'o', 'o', 'v'):
         case FOURCC('t', 'r', 'a', 'k'):
@@ -901,12 +913,65 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
 
             uint32_t entry_count = U32_AT(&buffer[4]);
 
+#ifdef QCOM_HARDWARE
+            off64_t stop_offset = *offset + chunk_size;
+            *offset = data_offset + 8;
+#endif
+
             if (entry_count > 1) {
                 // For 3GPP timed text, there could be multiple tx3g boxes contain
                 // multiple text display formats. These formats will be used to
                 // display the timed text.
                 const char *mime;
                 CHECK(mLastTrack->meta->findCString(kKeyMIMEType, &mime));
+#ifdef QCOM_HARDWARE
+                if (!strcasecmp(mime, MEDIA_MIMETYPE_TEXT_3GPP)) {
+                     LOGV("Text track found");
+                     for (uint32_t i = 0; i < entry_count; ++i) {
+                     status_t err = parseChunk(offset, depth + 1);
+                        if (err != OK) {
+                            return err;
+                        }
+                     }
+                    // For now we only support a single type of media per track.
+                }
+                else {
+                     LOGI("This clip has multiple avcc atoms ");
+                     status_t err = mLastTrack->sampleTable->setSampleDescParams(entry_count, *offset, chunk_data_size);
+                     if (err != OK) {
+                         return ERROR_IO;
+                     }
+                     //Initialize width, height parameters with first avc1 atom
+                     mHasVideo = true;
+                     uint8_t avc1[86];//(avc1-avcc) which is fixed
+                     if (mDataSource->readAt(*offset, avc1, sizeof(avc1)) < (ssize_t)sizeof(avc1)) {
+                         return ERROR_IO;
+                     }
+                     uint32_t chunk_type = U32_AT(&avc1[4]);
+                     uint16_t data_ref_index = U16_AT(&avc1[14]);
+                     uint16_t width = U16_AT(&avc1[32]);
+                     uint16_t height = U16_AT(&avc1[34]);
+
+                     mLastTrack->meta->setCString(kKeyMIMEType, FourCC2MIME(chunk_type));
+                     mLastTrack->meta->setInt32(kKeyWidth, width);
+                     mLastTrack->meta->setInt32(kKeyHeight, height);
+
+                     uint8_t *avcc;
+                     uint32_t avccSize;
+                     mLastTrack->sampleTable->getSampleDescAtIndex(1, &avcc, &avccSize);
+                     mLastTrack->meta->setData(kKeyAVCC, kTypeAVCC, avcc, avccSize);
+                     *offset = stop_offset;
+                }
+            } else {
+                 for (uint32_t i = 0; i < entry_count; ++i) {
+                     status_t err = parseChunk(offset, depth + 1);
+                     if (err != OK) {
+                        return err;
+                     }
+                 } // end of for
+
+            }//end of entry count 1
+#else
                 if (strcasecmp(mime, MEDIA_MIMETYPE_TEXT_3GPP)) {
                     // For now we only support a single type of media per track.
                     mLastTrack->skipTrack = true;
@@ -923,6 +988,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                     return err;
                 }
             }
+#endif
 
             if (*offset != stop_offset) {
                 return ERROR_MALFORMED;
@@ -1905,7 +1971,12 @@ MPEG4Source::MPEG4Source(
       mBuffer(NULL),
       mWantsNALFragments(false),
       mSrcBuffer(NULL),
+#ifdef QCOM_HARDWARE
+      mNumSamplesReadError(0),
+      mCurrentSampleDescIndex(0) {
+#else
       mNumSamplesReadError(0){
+#endif
     const char *mime;
     bool success = mFormat->findCString(kKeyMIMEType, &mime);
     CHECK(success);
@@ -1969,9 +2040,17 @@ status_t MPEG4Source::start(MetaData *params) {
     int32_t max_size;
     CHECK(mFormat->findInt32(kKeyMaxInputSize, &max_size));
 
+#ifdef QCOM_HARDWARE
+    uint32_t avccMaxSize = 0;
+    mSampleTable->getMaxAvccAtomSize(&avccMaxSize);
+    mGroup->add_buffer(new MediaBuffer(max_size + avccMaxSize));
+
+    mSrcBuffer = new uint8_t[max_size + avccMaxSize];
+#else
     mGroup->add_buffer(new MediaBuffer(max_size));
 
     mSrcBuffer = new uint8_t[max_size];
+#endif
 
     mStarted = true;
 
@@ -2034,6 +2113,12 @@ status_t MPEG4Source::read(
     *out = NULL;
 
     int64_t targetSampleTimeUs = -1;
+#ifdef QCOM_HARDWARE
+    uint32_t sampleDescIndex = 0;
+    uint8_t *avccData;
+    uint32_t avccSize;
+    bool insertAVCC = false;
+#endif
 
     int64_t seekTimeUs;
     ReadOptions::SeekMode mode;
@@ -2098,7 +2183,11 @@ status_t MPEG4Source::read(
 #if 0
         uint32_t syncSampleTime;
         CHECK_EQ(OK, mSampleTable->getMetaDataForSample(
+#ifdef QCOM_HARDWARE
+                    syncSampleIndex, NULL, NULL, &syncSampleTime, NULL, &sampleDescIndex));
+#else
                     syncSampleIndex, NULL, NULL, &syncSampleTime));
+#endif
 
         LOGI("seek to time %lld us => sample at time %lld us, "
              "sync sample at time %lld us",
@@ -2126,7 +2215,11 @@ status_t MPEG4Source::read(
 
         status_t err =
             mSampleTable->getMetaDataForSample(
+#ifdef QCOM_HARDWARE
+                    mCurrentSampleIndex, &offset, &size, &cts, &isSyncSample, &sampleDescIndex);
+#else
                     mCurrentSampleIndex, &offset, &size, &cts, &isSyncSample);
+#endif
 
         if (err != OK) {
             if (mStatistics) mNumSamplesReadError++;
@@ -2141,6 +2234,23 @@ status_t MPEG4Source::read(
             return err;
         }
     }
+
+#ifdef QCOM_HARDWARE
+    if ((sampleDescIndex > 1) && (mCurrentSampleDescIndex != sampleDescIndex)) {
+        insertAVCC = true;
+        mCurrentSampleDescIndex = sampleDescIndex;
+        if(mSampleTable->getSampleDescAtIndex(mCurrentSampleDescIndex, &avccData, &avccSize) != OK) {
+           LOGE("Error while reading avcC data at index (%d)", mCurrentSampleDescIndex);
+           return ERROR_MALFORMED;
+        }
+        const void *data;
+        const uint8_t *ptr = (const uint8_t *)avccData;
+        CHECK(avccSize >= 7);
+        CHECK_EQ((unsigned)ptr[0], 1u);  // configurationVersion == 1
+        mNALLengthSize = 1 + (ptr[4] & 3);
+        LOGV("mNALLengthSize is Updated to the new value %d",mNALLengthSize);
+    }
+#endif
 
     if (!mIsAVC || mWantsNALFragments) {
         if (newBuffer) {
@@ -2246,8 +2356,65 @@ status_t MPEG4Source::read(
             size_t srcOffset = 0;
             size_t dstOffset = 0;
 
+#ifdef QCOM_HARDWARE
+            if(insertAVCC == true) {
+                LOGV("MultiCodec: Updating the new AVCC atom");
+                const uint8_t *ptr = avccData;
+                size_t size = avccSize;
+                size_t numSeqParameterSets = avccData[5] & 31;
+
+                ptr += 6;
+                size -= 6;
+            for (size_t i = 0; i < numSeqParameterSets; ++i) {
+                CHECK(size >= 2);
+                size_t length = U16_AT(ptr);
+
+                ptr += 2;
+                size -= 2;
+
+                CHECK(size >= length);
+
+                dstData[dstOffset++] = 0;
+                dstData[dstOffset++] = 0;
+                dstData[dstOffset++] = 0;
+                dstData[dstOffset++] = 1;
+                memcpy(&dstData[dstOffset], ptr, length);
+                dstOffset += length;
+
+                ptr += length;
+                size -= length;
+            }
+            CHECK(size >= 1);
+            size_t numPictureParameterSets = *ptr;
+            ++ptr;
+            --size;
+
+            for (size_t i = 0; i < numPictureParameterSets; ++i) {
+                CHECK(size >= 2);
+                size_t length = U16_AT(ptr);
+
+                ptr += 2;
+                size -= 2;
+                CHECK(size >= length);
+
+                dstData[dstOffset++] = 0;
+                dstData[dstOffset++] = 0;
+                dstData[dstOffset++] = 0;
+                dstData[dstOffset++] = 1;
+                memcpy(&dstData[dstOffset], ptr, length);
+                dstOffset += length;
+
+                ptr += length;
+                size -= length;
+           }
+        }
+
+        while (srcOffset < size) {
+            bool isMalFormed = (srcOffset + mNALLengthSize > size);
+#else
             while (srcOffset < size) {
                 bool isMalFormed = (srcOffset + mNALLengthSize > size);
+#endif
                 size_t nalLength = 0;
                 if (!isMalFormed) {
                     nalLength = parseNALSize(&mSrcBuffer[srcOffset]);

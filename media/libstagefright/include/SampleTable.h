@@ -24,6 +24,9 @@
 #include <media/stagefright/MediaErrors.h>
 #include <utils/RefBase.h>
 #include <utils/threads.h>
+#ifdef QCOM_HARDWARE
+#include <utils/List.h>
+#endif
 
 namespace android {
 
@@ -66,7 +69,12 @@ public:
             off64_t *offset,
             size_t *size,
             uint32_t *compositionTime,
+#ifdef QCOM_HARDWARE
+            bool *isSyncSample = NULL,
+            uint32_t *sampleDescIndex = NULL);
+#else
             bool *isSyncSample = NULL);
+#endif
 
     enum {
         kFlagBefore,
@@ -82,6 +90,13 @@ public:
 
     status_t findThumbnailSample(uint32_t *sample_index);
     uint32_t getNumSyncSamples();
+
+#ifdef QCOM_HARDWARE
+    status_t setSampleDescParams(uint32_t entry_count, off64_t data_offset, size_t data_size);
+    status_t getSampleDescAtIndex(uint32_t index, uint8_t **ptr, uint32_t *size);
+    status_t getMaxAvccAtomSize(uint32_t *size);
+#endif
+
 protected:
     ~SampleTable();
 
@@ -143,6 +158,14 @@ private:
     static int CompareIncreasingTime(const void *, const void *);
 
     void buildSampleEntriesTable();
+
+#ifdef QCOM_HARDWARE
+    struct SampleDescAtom {
+        uint8_t *ptr;
+        uint32_t size;
+    };
+    List<SampleDescAtom *> mSampleDescAtoms;
+#endif
 
     SampleTable(const SampleTable &);
     SampleTable &operator=(const SampleTable &);
