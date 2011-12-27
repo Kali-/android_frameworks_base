@@ -1885,7 +1885,13 @@ void AwesomePlayer::onVideoEvent() {
 
         latenessUs = nowUs - timeUs;
 
+#ifdef QCOM_HARDWARE
+        mVideoBuffer->meta_data()->setInt64(kKeyLateness, latenessUs);
+
+        if (latenessUs > kVideoTooLateMarginUs
+#else
         if (latenessUs > 500000ll
+#endif
                 && mAudioPlayer != NULL
                 && mAudioPlayer->getMediaTimeMapping(
                     &realTimeUs, &mediaTimeUs)) {

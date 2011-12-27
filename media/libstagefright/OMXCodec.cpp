@@ -274,6 +274,9 @@ static const CodecInfo kDecoderInfo[] = {
     { MEDIA_MIMETYPE_VIDEO_MPEG4, "OMX.Nvidia.mp4.decode" },
     { MEDIA_MIMETYPE_VIDEO_MPEG4, "OMX.qcom.7x30.video.decoder.mpeg4" },
     { MEDIA_MIMETYPE_VIDEO_MPEG4, "OMX.qcom.video.decoder.mpeg4" },
+#ifdef QCOM_HARDWARE
+    { MEDIA_MIMETYPE_VIDEO_MPEG4, "OMX.ittiam.video.decoder.mpeg4" },
+#endif
     { MEDIA_MIMETYPE_VIDEO_MPEG4, "OMX.TI.Video.Decoder" },
     { MEDIA_MIMETYPE_VIDEO_MPEG4, "OMX.SEC.MPEG4.Decoder" },
     { MEDIA_MIMETYPE_VIDEO_MPEG4, "OMX.google.mpeg4.decoder" },
@@ -287,6 +290,9 @@ static const CodecInfo kDecoderInfo[] = {
     { MEDIA_MIMETYPE_VIDEO_AVC, "OMX.Nvidia.h264.decode" },
     { MEDIA_MIMETYPE_VIDEO_AVC, "OMX.qcom.7x30.video.decoder.avc" },
     { MEDIA_MIMETYPE_VIDEO_AVC, "OMX.qcom.video.decoder.avc" },
+#ifdef QCOM_HARDWARE
+    { MEDIA_MIMETYPE_VIDEO_AVC, "OMX.ittiam.video.decoder.avc" },
+#endif
     { MEDIA_MIMETYPE_VIDEO_AVC, "OMX.TI.Video.Decoder" },
     { MEDIA_MIMETYPE_VIDEO_AVC, "OMX.SEC.AVC.Decoder" },
     { MEDIA_MIMETYPE_VIDEO_AVC, "OMX.SEC.FP.AVC.Decoder" },
@@ -647,6 +653,12 @@ uint32_t OMXCodec::getComponentQuirks(
         quirks |= kRequiresAllocateBufferOnOutputPorts;
         quirks |= kDefersOutputBufferAllocation;
     }
+#ifdef QCOM_HARDWARE
+    if (!strncmp(componentName, "OMX.ittiam.video.decoder.", 25)) {
+        quirks |= kRequiresAllocateBufferOnOutputPorts;
+        quirks |= kDefersOutputBufferAllocation;
+    }
+#endif
     if (!strncmp(componentName, "OMX.qcom.7x30.video.decoder.", 28)) {
         quirks |= kRequiresAllocateBufferOnInputPorts;
         quirks |= kRequiresAllocateBufferOnOutputPorts;
@@ -2240,6 +2252,8 @@ OMXCodec::OMXCodec(
       bInvalidState(false),
       mInterlaceFormatDetected(false),
       mSPSParsed(false),
+      latenessUs(0),
+      LC_level(0),
       mThumbnailMode(false),
       mNumBFrames(0),
       mUseArbitraryMode(true),
@@ -5403,6 +5417,49 @@ status_t OMXCodec::read(
         }
     }
 
+#ifdef QCOM_HARDWARE
+    if (!strncmp("OMX.ittiam.video.decoder", mComponentName, 24)) {
+        OMX_INDEXTYPE index;
+        OMX_U32 set_level = 0;
+        #define LC_LEVEL2_HIGH_CUTOFF 125000
+        #define LC_LEVEL2_LOW_CUTOFF 100000
+        #define LC_LEVEL1_HIGH_CUTOFF 75000
+        #define LC_LEVEL1_LOW_CUTOFF 50000
+        CODEC_LOGV("OMXCodec latenessUs = %lld", latenessUs);
+        if((LC_level == 0) && (latenessUs > LC_LEVEL1_HIGH_CUTOFF))
+        {
+          LC_level = 1;
+          set_level = 1;
+        }
+        else if((LC_level == 1) && (latenessUs > LC_LEVEL2_HIGH_CUTOFF))
+        {
+          LC_level = 2;
+          set_level = 1;
+        }
+        else if((LC_level == 1) && (latenessUs < LC_LEVEL1_LOW_CUTOFF))
+        {
+          LC_level = 0;
+          set_level = 1;
+        }
+        else if((LC_level == 2) && (latenessUs < LC_LEVEL2_LOW_CUTOFF))
+        {
+          LC_level = 1;
+          set_level = 1;
+        }
+        if(set_level == 1)
+        {
+          CODEC_LOGV("set_level = 1");
+          status_t err = mOMX->getExtensionIndex(
+            mNode,
+            "OMX.ITTIAM.index.LClevel",
+            &index);
+          if (err != OK) {
+              return err;
+          }
+          mOMX->setConfig(mNode, index, &LC_level, sizeof(LC_level));
+        }
+    }
+#endif
     while (mState != ERROR && !mNoMoreOutputData && mFilledBuffers.empty()) {
         if ((err = waitForBufferFilled_l()) != OK) {
             return err;
@@ -5462,6 +5519,10 @@ void OMXCodec::signalBufferReturned(MediaBuffer *buffer) {
                 if (!metaData->findInt32(kKeyRendered, &rendered)) {
                     rendered = 0;
                 }
+#ifdef QCOM_HARDWARE
+                // Set latenessUs here from kKeyLateness
+                metaData->findInt64(kKeyLateness, &latenessUs);
+#endif
                 if (!rendered) {
                     status_t err = cancelBufferToNativeWindow(info);
                     if (err < 0) {

@@ -399,6 +399,9 @@ private:
 
     int32_t mNumBFrames;
     bool mUseArbitraryMode;
+
+    int64_t latenessUs;
+    uint32_t LC_level; // LOW_COMPLEXITY level
 #endif
 };
 
