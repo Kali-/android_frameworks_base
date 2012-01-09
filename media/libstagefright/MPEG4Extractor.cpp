@@ -1145,8 +1145,8 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             mLastTrack->meta->setInt32(kKeyChannelCount, num_channels);
             mLastTrack->meta->setInt32(kKeySampleRate, sample_rate);
 
+            off64_t stop_offset = *offset + chunk_size;
 #ifdef QCOM_HARDWARE
-            off_t stop_offset = *offset + chunk_size;
             if (!strcasecmp(MEDIA_MIMETYPE_AUDIO_MPEG,
                         FourCC2MIME(chunk_type))) {
                // ESD is not required in mp3
@@ -1155,7 +1155,6 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                *offset = data_offset + sizeof(buffer);
             }
 #else
-            off64_t stop_offset = *offset + chunk_size;
             *offset = data_offset + sizeof(buffer);
 #endif
             while (*offset < stop_offset) {
