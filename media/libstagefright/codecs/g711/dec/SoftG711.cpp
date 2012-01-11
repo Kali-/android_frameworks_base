@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2011 The Android Open Source Project
+ * Copyright (c) 2012, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,6 +43,9 @@ SoftG711::SoftG711(
     : SimpleSoftOMXComponent(name, callbacks, appData, component),
       mIsMLaw(true),
       mNumChannels(1),
+#ifdef QCOM_HARDWARE
+      mSampleRate(8000),
+#endif
       mSignalledError(false) {
     if (!strcmp(name, "OMX.google.g711.alaw.decoder")) {
         mIsMLaw = false;
@@ -122,7 +126,11 @@ OMX_ERRORTYPE SoftG711::internalGetParameter(
             pcmParams->eChannelMapping[1] = OMX_AUDIO_ChannelRF;
 
             pcmParams->nChannels = mNumChannels;
+#ifdef QCOM_HARDWARE
+            pcmParams->nSamplingRate = mSampleRate;
+#else
             pcmParams->nSamplingRate = 8000;
+#endif
 
             return OMX_ErrorNone;
         }
@@ -149,7 +157,9 @@ OMX_ERRORTYPE SoftG711::internalSetParameter(
             }
 
             mNumChannels = pcmParams->nChannels;
-
+#ifdef QCOM_HARDWARE
+            mSampleRate = pcmParams->nSamplingRate;
+#endif
             return OMX_ErrorNone;
         }
 

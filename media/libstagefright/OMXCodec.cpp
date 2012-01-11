@@ -14,6 +14,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+/*--------------------------------------------------------------------------
+Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
+--------------------------------------------------------------------------*/
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "OMXCodec"
@@ -1216,10 +1219,19 @@ status_t OMXCodec::configureCodec(const sp<MetaData> &meta) {
         // These are PCM-like formats with a fixed sample rate but
         // a variable number of channels.
 
+#ifdef QCOM_HARDWARE
+        int32_t numChannels, sampleRate ;
+#else
         int32_t numChannels;
+#endif
         CHECK(meta->findInt32(kKeyChannelCount, &numChannels));
+#ifdef QCOM_HARDWARE
+        CHECK(meta->findInt32(kKeySampleRate, &sampleRate));
 
+        setG711Format(numChannels, sampleRate);
+#else
         setG711Format(numChannels);
+#endif
     }
 
     if (!strncasecmp(mMIME, "video/", 6)) {
@@ -4992,11 +5004,17 @@ status_t OMXCodec::setWMAFormat(const sp<MetaData> &meta)
 	        return err;
 	    }
 	}
-#endif
 
+void OMXCodec::setG711Format(int32_t numChannels, int32_t sampleRate) {
+#else
 void OMXCodec::setG711Format(int32_t numChannels) {
+#endif
     CHECK(!mIsEncoder);
+#ifdef QCOM_HARDWARE
+    setRawAudioFormat(kPortIndexInput, sampleRate, numChannels);
+#else
     setRawAudioFormat(kPortIndexInput, 8000, numChannels);
+#endif
 }
 
 void OMXCodec::setImageOutputFormat(

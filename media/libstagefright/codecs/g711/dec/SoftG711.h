@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2011 The Android Open Source Project
+ * Copyright (c) 2012, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,6 +48,9 @@ private:
 
     bool mIsMLaw;
     OMX_U32 mNumChannels;
+#ifdef QCOM_HARDWARE
+    OMX_U32 mSampleRate;
+#endif
     bool mSignalledError;
 
     void initPorts();
