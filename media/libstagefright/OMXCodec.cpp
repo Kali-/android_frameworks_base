@@ -2414,6 +2414,7 @@ OMXCodec::OMXCodec(
       mSPSParsed(false),
       bInvalidState(false),
       latenessUs(0),
+      mInterlaceFrame(0),
       LC_level(0),
       mThumbnailMode(false),
       mNumBFrames(0),
@@ -4594,10 +4595,17 @@ bool OMXCodec::drainInputBuffer(BufferInfo *info) {
 
     OMX_U32 flags = OMX_BUFFERFLAG_ENDOFFRAME;
 
+#ifdef QCOM_HARDWARE
+    if(mInterlaceFormatDetected) {
+      mInterlaceFrame++;
+    }
+#endif
+
     if (signalEOS) {
         flags |= OMX_BUFFERFLAG_EOS;
 #ifdef QCOM_HARDWARE
-    } else if (mThumbnailMode) {
+    } else if ((mThumbnailMode && !mInterlaceFormatDetected)
+               || (mThumbnailMode && (mInterlaceFrame >= 2))) {
         // Because we don't get an EOS after getting the first frame, we
         // need to notify the component with OMX_BUFFERFLAG_EOS, set
         // mNoMoreOutputData to false so fillOutputBuffer gets called on
