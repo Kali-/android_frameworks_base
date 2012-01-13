@@ -371,12 +371,36 @@ private:
     OMXCodecObserver &operator=(const OMXCodecObserver &);
 };
 
+#ifdef QCOM_HARDWARE
+char *HwAacRoles[]={
+"OMX.qcom.audio.decoder.multiaac",
+"OMX.qcom.audio.decoder.aac",
+};
+#endif
+
 static const char *GetCodec(const CodecInfo *info, size_t numInfos,
                             const char *mime, int index) {
     CHECK(index >= 0);
+#ifdef QCOM_HARDWARE
+    char value[PROPERTY_VALUE_MAX];
+#endif
+
     for(size_t i = 0; i < numInfos; ++i) {
         if (!strcasecmp(mime, info[i].mime)) {
             if (index == 0) {
+
+#ifdef QCOM_HARDWARE
+                if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_AAC)){
+                    if (property_get("media.aaccodectype", value, NULL)){
+                        LOGE("using h/w aac decoder");
+                        if((atoi(value) >= 0 )&& (atoi(value) < 2) )
+                            return HwAacRoles[atoi(value)];
+                        else
+                            LOGE("media.aaccodectype value not supported");
+                    }
+                }
+#endif
+
                 return info[i].codec;
             }
 
