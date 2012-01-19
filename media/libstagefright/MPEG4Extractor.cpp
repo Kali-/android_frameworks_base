@@ -1317,7 +1317,11 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
 
         case FOURCC('a', 'v', 'c', 'C'):
         {
+#ifdef QCOM_HARDWARE
+            char buffer[512];
+#else
             char buffer[256];
+#endif
             if (chunk_data_size > (off64_t)sizeof(buffer)) {
                 return ERROR_BUFFER_TOO_SMALL;
             }
