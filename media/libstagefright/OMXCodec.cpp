@@ -3665,6 +3665,19 @@ void OMXCodec::onEvent(OMX_EVENTTYPE event, OMX_U32 data1, OMX_U32 data2) {
             CODEC_LOGV("OMX_EventPortSettingsChanged(port=%ld, data2=0x%08lx)",
                        data1, data2);
 
+#ifdef QCOM_HARDWARE
+            if ((mState != EXECUTING) && (mState != FLUSHING)) {
+                CODEC_LOGE("Ignore PortSettingsChanged event mState == %d ", mState);
+                break;
+            }
+
+            if (mState == FLUSHING) {
+                CODEC_LOGE("Received port reconfig while waiting for FBD\n");
+                // Seek is completed and waiting for FBD, at this instance
+                // Port reconfig is received rather than FBD.
+            }
+#endif
+
             if (data2 == 0 || data2 == OMX_IndexParamPortDefinition) {
 
 #ifndef QCOM_HARDWARE
