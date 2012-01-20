@@ -4488,7 +4488,12 @@ bool OMXCodec::drainInputBuffer(BufferInfo *info) {
         return true;
     }
 
+#ifdef QCOM_HARDWARE
+    if ((!strncmp(mComponentName, "OMX.qcom.", 9)) && mPaused) {
+        CODEC_LOGE("Returning as in Pause State and H/W decoder");
+#else
     if (mPaused) {
+#endif
         return false;
     }
 
