@@ -752,7 +752,16 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             while (*offset < stop_offset) {
                 status_t err = parseChunk(offset, depth + 1);
                 if (err != OK) {
+#ifdef QCOM_HARDWARE
+                    if(chunk_type == FOURCC('u', 'd', 't', 'a')){
+                        LOGW("error in udta atom, ignoring %llu bytes",stop_offset - *offset);
+                        *offset = stop_offset;
+                    } else {
+                        return err;
+                    }
+#else
                     return err;
+#endif
                 }
             }
 
