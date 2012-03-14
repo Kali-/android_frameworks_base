@@ -563,6 +563,12 @@ uint32_t OMXCodec::getComponentQuirks(
         quirks |= kRequiresAllocateBufferOnOutputPorts;
     }
 #endif
+    if(!strcmp(componentName, "OMX.qcom.audio.decoder.multiaac"))  {
+       LOGV("setting kRequiresGlobalFlush for Multi aac");
+       quirks |= kRequiresGlobalFlush;
+    }
+
+
     if (!strcmp(componentName, "OMX.qcom.audio.encoder.evrc")) {
         quirks |= kRequiresAllocateBufferOnInputPorts;
         quirks |= kRequiresAllocateBufferOnOutputPorts;
