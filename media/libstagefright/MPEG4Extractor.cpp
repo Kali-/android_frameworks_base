@@ -1318,7 +1318,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
         case FOURCC('a', 'v', 'c', 'C'):
         {
 #ifdef QCOM_HARDWARE
-            char buffer[512];
+            char buffer[1024];
 #else
             char buffer[256];
 #endif
