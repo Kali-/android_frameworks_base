@@ -104,7 +104,9 @@ protected:
     virtual ~OMXCodec();
 
 private:
-
+#ifdef QCOM_HARDWARE
+	static bool mSecureStart;
+#endif
     // Make sure mLock is accessible to OMXCodecObserver
     friend class OMXCodecObserver;
 
