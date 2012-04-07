@@ -139,6 +139,9 @@ private:
         TEXTPLAYER_STARTED  = 0x20000,
 
         SLOW_DECODER_HACK   = 0x40000,
+#ifdef QCOM_HARDWARE
+        NOTIFY_ATTRIBUTES   = 0x80000000,
+#endif
     };
 
     mutable Mutex mLock;
@@ -306,6 +309,10 @@ private:
     void logOnTime(int64_t ts, int64_t clock, int64_t delta);
     void logSyncLoss();
     int64_t getTimeOfDayUs();
+#ifdef QCOM_HARDWARE
+    void notifyVideoAttributes_l();
+#endif
+
     bool mVeryFirstFrame;
     bool mStatistics;
 

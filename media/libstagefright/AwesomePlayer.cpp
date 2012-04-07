@@ -61,6 +61,9 @@
 #include <media/stagefright/foundation/AMessage.h>
 
 #include <cutils/properties.h>
+#ifdef QCOM_HARDWARE
+#include <gralloc_priv.h>
+#endif
 
 #define USE_SURFACE_ALLOC 1
 #define FRAME_DROP_FREQ 0
@@ -1820,6 +1823,13 @@ void AwesomePlayer::onVideoEvent() {
         }
     }
 
+#ifdef QCOM_HARDWARE
+    if (mFlags & NOTIFY_ATTRIBUTES) {
+        modifyFlags(NOTIFY_ATTRIBUTES, CLEAR);
+        notifyVideoAttributes_l();
+    }
+#endif
+
     int64_t timeUs;
     CHECK(mVideoBuffer->meta_data()->findInt64(kKeyTime, &timeUs));
 
@@ -2436,6 +2446,9 @@ void AwesomePlayer::finishAsyncPrepare_l() {
     mPrepareResult = OK;
     modifyFlags((PREPARING|PREPARE_CANCELLED|PREPARING_CONNECTED), CLEAR);
     modifyFlags(PREPARED, SET);
+#ifdef QCOM_HARDWARE
+    modifyFlags(NOTIFY_ATTRIBUTES, SET);
+#endif
     mAsyncPrepareEvent = NULL;
     mPreparedCondition.broadcast();
 }
@@ -2472,6 +2485,25 @@ status_t AwesomePlayer::setParameter(int key, const Parcel &request) {
         {
             return setCacheStatCollectFreq(request);
         }
+#ifdef QCOM_HARDWARE
+        case KEY_PARAMETER_3D_ATTRIBUTES:
+        {
+            int32_t format3D = 0;
+            sp<MetaData> meta = mVideoSource->getFormat();
+
+            request.readInt32(&format3D);
+
+            //Validate it, but client really shouldn't be messing with this
+            CHECK(!(format3D & ~(HAL_3D_OUT_SIDE_BY_SIDE |
+                                 HAL_3D_OUT_TOP_BOTTOM   |
+                                 HAL_3D_IN_SIDE_BY_SIDE_R_L |
+                                 HAL_3D_IN_SIDE_BY_SIDE_L_R |
+                                 HAL_3D_IN_TOP_BOTTOM)));
+
+            meta->setInt32(kKey3D, format3D);
+            return OK;
+        }
+#endif
         default:
         {
             return ERROR_UNSUPPORTED;
@@ -2664,4 +2696,18 @@ inline int64_t AwesomePlayer::getTimeOfDayUs() {
 
     return (int64_t)tv.tv_sec * 1000000 + tv.tv_usec;
 }
+
+#ifdef QCOM_HARDWARE
+void AwesomePlayer::notifyVideoAttributes_l() {
+    sp<MetaData> meta = mVideoSource->getFormat();
+    int format3D = 0;
+
+    if (!meta->findInt32(kKey3D, &format3D))
+        format3D = 0;
+
+    notifyListener_l(MEDIA_INFO,
+                     KEY_PARAMETER_3D_ATTRIBUTES, format3D);
+}
+#endif
+
 }  // namespace android
