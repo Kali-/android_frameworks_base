@@ -374,14 +374,22 @@ sp<MetaData> MPEG4Extractor::getTrackMetaData(
         CHECK(track->meta->findCString(kKeyMIMEType, &mime));
         if (!strncasecmp("video/", mime, 6)) {
             uint32_t sampleIndex;
+#ifdef QCOM_HARDWARE
+            uint64_t sampleTime;
+#else
             uint32_t sampleTime;
+#endif
             if (track->sampleTable->findThumbnailSample(&sampleIndex) == OK
                     && track->sampleTable->getMetaDataForSample(
                         sampleIndex, NULL /* offset */, NULL /* size */,
                         &sampleTime) == OK) {
                 track->meta->setInt64(
                         kKeyThumbnailTime,
+#ifdef QCOM_HARDWARE
+                        (sampleTime * 1000000) / track->timescale);
+#else
                         ((int64_t)sampleTime * 1000000) / track->timescale);
+#endif
             }
         }
     }
@@ -2331,7 +2339,11 @@ status_t MPEG4Source::read(
                     sampleIndex, &syncSampleIndex, findFlags);
         }
 
+#ifdef QCOM_HARDWARE
+        uint64_t sampleTime;
+#else
         uint32_t sampleTime;
+#endif
         if (err == OK) {
             err = mSampleTable->getMetaDataForSample(
                     sampleIndex, NULL, NULL, &sampleTime);
@@ -2354,7 +2366,11 @@ status_t MPEG4Source::read(
         }
 
 #if 0
+#ifdef QCOM_HARDWARE
+        uint64_t syncSampleTime;
+#else
         uint32_t syncSampleTime;
+#endif
         CHECK_EQ(OK, mSampleTable->getMetaDataForSample(
 #ifdef QCOM_HARDWARE
                     syncSampleIndex, NULL, NULL, &syncSampleTime, NULL, &sampleDescIndex));
@@ -2380,7 +2396,11 @@ status_t MPEG4Source::read(
 
     off64_t offset;
     size_t size;
+#ifdef QCOM_HARDWARE
+    uint64_t cts;
+#else
     uint32_t cts;
+#endif
     bool isSyncSample;
     bool newBuffer = false;
     if (mBuffer == NULL) {
@@ -2449,7 +2469,11 @@ status_t MPEG4Source::read(
             mBuffer->set_range(0, size);
             mBuffer->meta_data()->clear();
             mBuffer->meta_data()->setInt64(
+#ifdef QCOM_HARDWARE
+                    kKeyTime, (cts * 1000000) / mTimescale);
+#else
                     kKeyTime, ((int64_t)cts * 1000000) / mTimescale);
+#endif
 
             if (targetSampleTimeUs >= 0) {
                 mBuffer->meta_data()->setInt64(
@@ -2642,7 +2666,11 @@ status_t MPEG4Source::read(
 
         mBuffer->meta_data()->clear();
         mBuffer->meta_data()->setInt64(
+#ifdef QCOM_HARDWARE
+                kKeyTime, (cts * 1000000) / mTimescale);
+#else
                 kKeyTime, ((int64_t)cts * 1000000) / mTimescale);
+#endif
 
         if (targetSampleTimeUs >= 0) {
             mBuffer->meta_data()->setInt64(

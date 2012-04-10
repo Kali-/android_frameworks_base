@@ -286,7 +286,11 @@ status_t SampleIterator::getSampleSizeDirect(
 }
 
 status_t SampleIterator::findSampleTime(
+#ifdef QCOM_HARDWARE
+        uint32_t sampleIndex, uint64_t *time) {
+#else
         uint32_t sampleIndex, uint32_t *time) {
+#endif
     if (sampleIndex >= mTable->mNumSampleSizes) {
         return ERROR_OUT_OF_RANGE;
     }
@@ -305,9 +309,15 @@ status_t SampleIterator::findSampleTime(
         ++mTimeToSampleIndex;
     }
 
+#ifdef QCOM_HARDWARE
+    *time = mTTSSampleTime + (uint64_t)mTTSDuration * ((uint64_t)sampleIndex - (uint64_t)mTTSSampleIndex);
+
+    *time = *time + mTable->getCompositionTimeOffset(sampleIndex);
+#else
     *time = mTTSSampleTime + mTTSDuration * (sampleIndex - mTTSSampleIndex);
 
     *time = (int64_t)(*time) + (int32_t)mTable->getCompositionTimeOffset(sampleIndex);
+#endif
 
     return OK;
 }

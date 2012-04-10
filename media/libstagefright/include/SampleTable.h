@@ -68,11 +68,12 @@ public:
             uint32_t sampleIndex,
             off64_t *offset,
             size_t *size,
-            uint32_t *compositionTime,
 #ifdef QCOM_HARDWARE
+            uint64_t *compositionTime,
             bool *isSyncSample = NULL,
             uint32_t *sampleDescIndex = NULL);
 #else
+            uint32_t *compositionTime,
             bool *isSyncSample = NULL);
 #endif
 
@@ -82,7 +83,11 @@ public:
         kFlagClosest
     };
     status_t findSampleAtTime(
+#ifdef QCOM_HARDWARE
+            uint64_t req_time, uint32_t *sample_index, uint32_t flags);
+#else
             uint32_t req_time, uint32_t *sample_index, uint32_t flags);
+#endif
 
     status_t findSyncSampleNear(
             uint32_t start_sample_index, uint32_t *sample_index,
@@ -128,7 +133,11 @@ private:
 
     struct SampleTimeEntry {
         uint32_t mSampleIndex;
+#ifdef QCOM_HARDWARE
+        uint64_t mCompositionTime;
+#else
         uint32_t mCompositionTime;
+#endif
     };
     SampleTimeEntry *mSampleTimeEntries;
 
