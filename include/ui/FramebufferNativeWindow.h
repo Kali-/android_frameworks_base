@@ -73,6 +73,10 @@ public:
 
     // for debugging only
     int getCurrentBufferIndex() const;
+    void perform(int event, int info) {
+        if (fbDev->perform)
+            fbDev->perform(fbDev, event, info);
+    }
 
 private:
     friend class LightRefBase<FramebufferNativeWindow>;    

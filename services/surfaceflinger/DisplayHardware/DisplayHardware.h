@@ -77,7 +77,7 @@ public:
     void        makeCurrent() const;
     uint32_t    getMaxTextureSize() const;
     uint32_t    getMaxViewportDims() const;
-#ifdef QCOM_HDMI_OUT
+#ifdef QCOM_HARDWARE
     void        orientationChanged(int orientation) const;
     void        setActionSafeWidthRatio(float asWidthRatio) const;
     void        setActionSafeHeightRatio(float asHeightRatio) const;
@@ -103,6 +103,9 @@ public:
 
     // only for debugging
     int getCurrentBufferIndex() const;
+#ifdef QCOM_HARDWARE
+    void perform(int, int) const;
+#endif
 
 private:
     void init(uint32_t displayIndex) __attribute__((noinline));

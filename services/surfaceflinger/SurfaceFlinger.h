@@ -186,6 +186,10 @@ public:
     //HDMI Specific
     virtual void                        enableExternalDisplay(int disp_type, int externaltype);
 #endif
+#ifdef QCOM_HARDWARE
+    //Qcom specific
+    virtual void                        perform(int event, int info);
+#endif
 
     virtual status_t captureScreen(DisplayID dpy,
             sp<IMemoryHeap>* heap,

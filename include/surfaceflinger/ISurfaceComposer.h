@@ -136,7 +136,9 @@ public:
     //External display specific functions
     virtual void enableExternalDisplay(int disp_type, int enable) = 0;
 #endif
-
+#ifdef QCOM_HARDWARE
+    virtual void perform(int event, int info) = 0;
+#endif
 };
 
 // ----------------------------------------------------------------------------
@@ -159,6 +161,16 @@ public:
         AUTHENTICATE_SURFACE,
 #ifdef QCOM_HDMI_OUT
         EXTERNAL_DISPLAY,
+#endif
+#ifdef QCOM_HARDWARE
+        PERFORM,
+    };
+
+    enum { //EVENTS for PERFORM
+        EVENT_SC_OPEN_SECURE_START,
+        EVENT_SC_OPEN_SECURE_END,
+        EVENT_SC_CLOSE_SECURE_START,
+        EVENT_SC_CLOSE_SECURE_END,
 #endif
     };
 

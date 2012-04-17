@@ -185,7 +185,16 @@ public:
         remote()->transact(BnSurfaceComposer::EXTERNAL_DISPLAY, data, &reply);
     }
 #endif
-
+#ifdef QCOM_HARDWARE
+    virtual void perform(int event, int info)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(ISurfaceComposer::getInterfaceDescriptor());
+        data.writeInt32(event);
+        data.writeInt32(info);
+        remote()->transact(BnSurfaceComposer::PERFORM, data, &reply);
+    }
+#endif
 };
 
 IMPLEMENT_META_INTERFACE(SurfaceComposer, "android.ui.ISurfaceComposer");
@@ -272,6 +281,14 @@ status_t BnSurfaceComposer::onTransact(
             int disp_type = data.readInt32();
             int enable = data.readInt32();
             enableExternalDisplay(disp_type, enable);
+        } break;
+#endif
+#ifdef QCOM_HARDWARE
+        case PERFORM: {
+            CHECK_INTERFACE(ISurfaceComposer, data, reply);
+            int event = data.readInt32();
+            int info = data.readInt32();
+            perform(event, info);
         } break;
 #endif
         default:
