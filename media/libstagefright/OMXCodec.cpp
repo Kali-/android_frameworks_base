@@ -43,9 +43,6 @@
 #include <media/stagefright/OMXCodec.h>
 #include <media/stagefright/Utils.h>
 #include <utils/Vector.h>
-#ifdef QCOM_HARDWARE
-#include <cutils/properties.h>
-#endif
 
 #include <OMX_Audio.h>
 #include <OMX_Component.h>
@@ -2214,6 +2211,16 @@ status_t OMXCodec::init() {
     while (mState != EXECUTING && mState != ERROR) {
         mAsyncCompletion.wait(mLock);
     }
+
+#ifdef QCOM_HARDWARE
+    // Call stop to perform cleanup in case there was an error
+    // when moving to executing state.
+    if (mState == ERROR) {
+        mLock.unlock();
+        stop();
+        mLock.lock();
+    }
+#endif
 
     return mState == ERROR ? UNKNOWN_ERROR : OK;
 }
@@ -4930,6 +4937,12 @@ status_t OMXCodec::stop() {
                . On a disabled port when the component is in the OMX_StateExecuting,
                  the OMX_StatePause, or the OMX_StateIdle state.
             */
+            if (state == OMX_StateIdle) {
+                err = mOMX->sendCommand(
+                    mNode, OMX_CommandStateSet, OMX_StateLoaded);
+                CHECK_EQ(err, (status_t)OK);
+                setState(IDLE_TO_LOADED);
+            }
 
             bool canFree = true;
             if (!strncmp(mComponentName, "OMX.qcom.video.decoder.", 23) ||
@@ -4953,12 +4966,21 @@ status_t OMXCodec::stop() {
             if (canFree) {
                 err = freeBuffersOnPort(kPortIndexOutput, true);
                 CHECK_EQ(err, (status_t)OK);
+                err = freeBuffersOnPort(kPortIndexInput, true);
+                CHECK_EQ(err, (status_t)OK);
             }
             else {
                 LOGW("%s IL component does not match conditions for free, skip freeing for later",
                      mComponentName);
             }
 #endif
+
+            if (state == OMX_StateIdle) {
+                while (mState != LOADED && mState != ERROR) {
+                    mAsyncCompletion.wait(mLock);
+                }
+                setState(ERROR);
+            }
 
             if (state != OMX_StateExecuting) {
                 break;
