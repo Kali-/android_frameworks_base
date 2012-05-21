@@ -373,6 +373,10 @@ private:
 
     // Avoid copying and equating and default constructor
     DISALLOW_IMPLICIT_CONSTRUCTORS(SurfaceMediaSource);
+
+#ifdef QCOM_HARDWARE
+    uint32_t mUsageQuirks;
+#endif
 };
 
 // ----------------------------------------------------------------------------
