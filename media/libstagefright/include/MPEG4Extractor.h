@@ -91,6 +91,11 @@ private:
 
     Track *findTrackByMimePrefix(const char *mimePrefix);
 
+#ifdef QCOM_HARDWARE
+    status_t updateVideoTrackInfoFromESDS_MPEG4Video(
+            const void *esds_data, size_t esds_size);
+#endif
+
     MPEG4Extractor(const MPEG4Extractor &);
     MPEG4Extractor &operator=(const MPEG4Extractor &);
 };
