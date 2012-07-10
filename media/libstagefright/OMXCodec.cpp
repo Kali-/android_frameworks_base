@@ -1984,10 +1984,13 @@ status_t OMXCodec::setupH263EncoderParameters(const sp<MetaData>& meta) {
 
     frameRate = hfr ? hfr : frameRate;
     bitRate = hfr ? (hfrRatio*bitRate) : bitRate;
-    h263type.nPFrames = setPFramesSpacing(iFramesInterval, frameRate / hfrRatio);
-#endif
     h263type.nAllowedPictureTypes =
         OMX_VIDEO_PictureTypeI | OMX_VIDEO_PictureTypeP;
+    h263type.nPFrames = setPFramesSpacing(iFramesInterval, frameRate / hfrRatio);
+#else
+    h263type.nAllowedPictureTypes =
+        OMX_VIDEO_PictureTypeI | OMX_VIDEO_PictureTypeP;
+#endif
 
     if (h263type.nPFrames == 0) {
         h263type.nAllowedPictureTypes = OMX_VIDEO_PictureTypeI;
@@ -2083,8 +2086,8 @@ status_t OMXCodec::setupMPEG4EncoderParameters(const sp<MetaData>& meta) {
     if (mpeg4type.eProfile > OMX_VIDEO_MPEG4ProfileSimple) {
         mpeg4type.nAllowedPictureTypes |= OMX_VIDEO_PictureTypeB;
         mpeg4type.nBFrames = 1;
-        mpeg4type.nPFrames = mpeg4type.nPFrames / 2;
         mNumBFrames = 1;
+        mpeg4type.nPFrames = mpeg4type.nPFrames / 2;
     }
 #endif
 
@@ -2171,8 +2174,8 @@ status_t OMXCodec::setupAVCEncoderParameters(const sp<MetaData>& meta) {
     if (h264type.eProfile > OMX_VIDEO_AVCProfileBaseline) {
         h264type.nPFrames = setPFramesSpacing(iFramesInterval, frameRate / hfrRatio);
         h264type.nBFrames = 1;
-        h264type.nPFrames = h264type.nPFrames / 2;
         mNumBFrames = 1;
+        h264type.nPFrames = h264type.nPFrames / 2;
     }
 #endif
 
@@ -2406,16 +2409,16 @@ OMXCodec::OMXCodec(
       mLeftOverBuffer(NULL),
       mPaused(false),
 #ifdef QCOM_HARDWARE
-      bInvalidState(false),
       mIsAacFormatAdif(0),
       mInterlaceFormatDetected(false),
       mSPSParsed(false),
+      bInvalidState(false),
       latenessUs(0),
       LC_level(0),
       mThumbnailMode(false),
       mNumBFrames(0),
-      mUseArbitraryMode(true),
       m3DVideoDetected(false),
+      mUseArbitraryMode(true),
 #endif
       mNativeWindow(
               (!strncmp(componentName, "OMX.google.", 11)
