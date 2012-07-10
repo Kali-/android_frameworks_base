@@ -2417,16 +2417,20 @@ OMXCodec::OMXCodec(
       mInterlaceFrame(0),
       LC_level(0),
       mThumbnailMode(false),
-      mNumBFrames(0),
       m3DVideoDetected(false),
-      mUseArbitraryMode(true),
-#endif
+      mNativeWindow(
+              (!strncmp(componentName, "OMX.google.", 11)
+              || !strcmp(componentName, "OMX.Nvidia.mpeg2v.decode"))
+                        ? NULL : nativeWindow),
+      mNumBFrames(0),
+      mUseArbitraryMode(true) {
+
+    parseFlags();
+#else
       mNativeWindow(
               (!strncmp(componentName, "OMX.google.", 11)
               || !strcmp(componentName, "OMX.Nvidia.mpeg2v.decode"))
                         ? NULL : nativeWindow) {
-#ifdef QCOM_HARDWARE
-    parseFlags();
 #endif
     mPortStatus[kPortIndexInput] = ENABLED;
     mPortStatus[kPortIndexOutput] = ENABLED;
