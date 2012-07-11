@@ -130,13 +130,21 @@ sp<MediaExtractor> MediaExtractor::Create(
     }
 
 #ifdef QCOM_HARDWARE
-    if (ret) return ret;
+    //If default extractor created, then pass them
+    if (ret){
+        return ret;
+    }
 
-        LOGV(" Using ExtendedExtractor\n");
-    return ExtendedExtractor::CreateExtractor(source, mime);
-#else
-    return ret;
+    //Create Extended Extractor only if default extractor are not selected
+    LOGV(" Using ExtendedExtractor\n");
+    sp<MediaExtractor> retextParser =  ExtendedExtractor::CreateExtractor(source, mime);
+
+    if (retextParser != NULL){
+        return retextParser;
+    }
 #endif
+
+    return ret;
 }
 
 }  // namespace android
