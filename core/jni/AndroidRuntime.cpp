@@ -89,6 +89,10 @@ extern int register_android_media_ToneGenerator(JNIEnv *env);
 
 extern int register_android_util_FloatMath(JNIEnv* env);
 
+#ifdef QCOM_FM_ENABLED
+extern int register_android_hardware_fm_fmradio(JNIEnv* env);
+#endif
+
 namespace android {
 
 /*
@@ -1204,6 +1208,9 @@ static const RegJNIRec gRegJNI[] = {
 
 #ifdef QCOM_HARDWARE
     REG_JNI(register_com_android_internal_app_ActivityTrigger),
+#ifdef QCOM_FM_ENABLED
+    REG_JNI(register_android_hardware_fm_fmradio),
+#endif
 #endif
 
 };
