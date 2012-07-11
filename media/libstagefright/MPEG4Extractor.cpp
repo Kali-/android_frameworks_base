@@ -2703,7 +2703,7 @@ static bool LegacySniffMPEG4(
         || !memcmp(header, "ftypFACE", 8) || !memcmp(header, "ftypwmf", 7)) {
 #else
         || !memcmp(header, "ftypmp41", 8) || !memcmp(header, "ftypskm3", 8)) {
-#else
+#endif
         *mimeType = MEDIA_MIMETYPE_CONTAINER_MPEG4;
         *confidence = 0.6;
 

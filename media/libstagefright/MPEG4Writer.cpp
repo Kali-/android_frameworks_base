@@ -43,11 +43,10 @@
 
 namespace android {
 
+static const int64_t kMax32BitFileSize = 0x007fffffffLL;
 #ifdef QCOM_HARDWARE
 static const int64_t kMax64BitFileSize = 0x00ffffffffLL; //fat32 max size limited to 4GB
 static const uint8_t kNalUnitTypeSeqEnhanceInfo = 0x06;
-#else
-static const int64_t kMax32BitFileSize = 0x007fffffffLL;
 #endif
 static const uint8_t kNalUnitTypeSeqParamSet = 0x07;
 static const uint8_t kNalUnitTypePicParamSet = 0x08;

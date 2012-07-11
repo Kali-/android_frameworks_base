@@ -406,9 +406,6 @@ private:
     status_t setWMAFormat(const sp<MetaData> &inputFormat);
     void setAC3Format(int32_t numChannels, int32_t sampleRate);
 
-    int32_t mNumBFrames;
-    bool mUseArbitraryMode;
-
     int64_t latenessUs;
     uint32_t LC_level; // LOW_COMPLEXITY level
     int32_t mInterlaceFrame;
