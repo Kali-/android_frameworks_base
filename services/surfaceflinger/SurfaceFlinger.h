@@ -182,7 +182,7 @@ public:
     virtual int                         setOrientation(DisplayID dpy, int orientation, uint32_t flags);
     virtual bool                        authenticateSurfaceTexture(const sp<ISurfaceTexture>& surface) const;
 
-#ifdef QCOM_HDMI_OUT
+#ifdef QCOM_HARDWARE
     //HDMI Specific
     virtual void                        enableExternalDisplay(int disp_type, int externaltype);
 #endif
@@ -356,7 +356,7 @@ private:
             void        debugShowFPS() const;
             void        drawWormhole() const;
 
-#ifdef QCOM_HDMI_OUT
+#ifdef QCOM_HARDWARE
             //HDMI Specific
             void updateHwcExternalDisplay(int externaltype);
 #endif
@@ -416,13 +416,11 @@ private:
                 nsecs_t                     mLastTransactionTime;
                 bool                        mBootFinished;
 
-#ifdef QCOM_HDMI_OUT
+#ifdef QCOM_HARDWARE
                 //HDMI specific
                 int                         mExtDispOutput;
                 Mutex                       mExtDispLock;
                 bool                        mOrientationChanged;
-#endif
-#ifdef QCOM_HARDWARE
                 bool                        mCanSkipComposition;
 #endif
 

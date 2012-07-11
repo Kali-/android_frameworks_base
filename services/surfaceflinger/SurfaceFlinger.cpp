@@ -105,10 +105,8 @@ SurfaceFlinger::SurfaceFlinger()
         mDebugInTransaction(0),
         mLastTransactionTime(0),
         mBootFinished(false),
-#ifdef QCOM_HDMI_OUT
-        mExtDispOutput(EXT_TYPE_NONE),
-#endif
 #ifdef QCOM_HARDWARE
+        mExtDispOutput(EXT_TYPE_NONE),
         mCanSkipComposition(false),
 #endif
         mConsoleSignals(0),
@@ -423,7 +421,7 @@ bool SurfaceFlinger::threadLoop()
         handleConsoleEvents();
     }
 
-#ifdef QCOM_HDMI_OUT
+#ifdef QCOM_HARDWARE
     //Serializes HDMI event handling and drawing.
     //Necessary for race-free overlay channel management.
     //Must always be held only after handleConsoleEvents() since
@@ -498,7 +496,7 @@ void SurfaceFlinger::postFramebuffer()
     LOGW_IF(mSwapRegion.isEmpty(), "mSwapRegion is empty");
     const DisplayHardware& hw(graphicPlane(0).displayHardware());
     const nsecs_t now = systemTime();
-#ifdef QCOM_HDMI_OUT
+#ifdef QCOM_HARDWARE
     const GraphicPlane& plane(graphicPlane(0));
     const Transform& planeTransform(plane.transform());
 #endif
@@ -524,7 +522,7 @@ void SurfaceFlinger::handleConsoleEvents()
     int what = android_atomic_and(0, &mConsoleSignals);
     if (what & eConsoleAcquired) {
         hw.acquireScreen();
-#ifdef QCOM_HDMI_OUT
+#ifdef QCOM_HARDWARE
         updateHwcExternalDisplay(mExtDispOutput);
 #endif
     }
@@ -532,7 +530,7 @@ void SurfaceFlinger::handleConsoleEvents()
     if (what & eConsoleReleased) {
         if (hw.isScreenAcquired()) {
             hw.releaseScreen();
-#ifdef QCOM_HDMI_OUT
+#ifdef QCOM_HARDWARE
             updateHwcExternalDisplay(false);
 #endif
         }
@@ -600,7 +598,7 @@ void SurfaceFlinger::handleTransactionLocked(uint32_t transactionFlags)
             // Currently unused: const uint32_t flags = mCurrentState.orientationFlags;
             GraphicPlane& plane(graphicPlane(dpy));
             plane.setOrientation(orientation);
-#ifdef QCOM_HDMI_OUT
+#ifdef QCOM_HARDWARE
             mOrientationChanged = true;
 #endif
 
@@ -1392,7 +1390,7 @@ int SurfaceFlinger::setOrientation(DisplayID dpy,
     return orientation;
 }
 
-#ifdef QCOM_HDMI_OUT
+#ifdef QCOM_HARDWARE
 void SurfaceFlinger::updateHwcExternalDisplay(int externaltype)
 {
     invalidateHwcGeometry();
@@ -1419,9 +1417,7 @@ void SurfaceFlinger::enableExternalDisplay(int disp_type, int value)
         signalEvent();
     }
 }
-#endif
 
-#ifdef QCOM_HARDWARE
 /*
  * Qcom specific. Handles events from clients.
  */

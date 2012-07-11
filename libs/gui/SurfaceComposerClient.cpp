@@ -280,7 +280,7 @@ status_t Composer::setFreezeTint(const sp<SurfaceComposerClient>& client,
     return NO_ERROR;
 }
 
-#ifdef QCOM_HDMI_OUT
+#ifdef QCOM_HARDWARE
 void SurfaceComposerClient::enableExternalDisplay(int disp_type, int enable)
 {
     sp<ISurfaceComposer> sm(getComposerService());
