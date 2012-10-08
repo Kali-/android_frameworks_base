@@ -164,6 +164,10 @@ ifeq ($(BOARD_USES_QCOM_HARDWARE),true)
 	    com_android_internal_app_ActivityTrigger.cpp
     LOCAL_C_INCLUDES += \
 	    hardware/qcom/display/libtilerenderer
+ifeq ($(BOARD_HAVE_QCOM_FM),true)
+    LOCAL_SRC_FILES += android_hardware_fm.cpp
+    LOCAL_CFLAGS += -DQCOM_FM_ENABLED
+endif
 endif
 
 LOCAL_C_INCLUDES += \
@@ -193,6 +197,16 @@ LOCAL_C_INCLUDES += \
 	external/zlib \
 	frameworks/opt/emoji \
 	libcore/include
+
+ifeq ($(BOARD_HAVE_QCOM_FM),true)
+LOCAL_CFLAGS += -include bionic/libc/kernel/arch-arm/asm/posix_types.h
+LOCAL_CFLAGS += -include bionic/libc/kernel/arch-arm/asm/byteorder.h
+LOCAL_CFLAGS += -include bionic/libc/kernel/common/linux/types.h
+LOCAL_CFLAGS += -include bionic/libc/kernel/common/linux/posix_types.h
+LOCAL_CFLAGS += -include bionic/libc/kernel/common/linux/socket.h
+LOCAL_CFLAGS += -include bionic/libc/kernel/common/linux/in.h
+LOCAL_CFLAGS += -include bionic/libc/kernel/common/linux/un.h
+endif
 
 LOCAL_SHARED_LIBRARIES := \
 	libandroidfw \

@@ -40,6 +40,11 @@ SECONDARY_FRAMEWORKS_SUBDIRS := \
         media/mca/effect/java/android/media/effect \
         media/mca/effect/java/android/media/effect/effects
 
+ifeq ($(BOARD_HAVE_QCOM_FM),true)
+SECONDARY_FRAMEWORKS_SUBDIRS += \
+        core/java/android/hardware/fmradio
+endif
+
 include $(CLEAR_VARS)
 
 # FRAMEWORKS_BASE_SUBDIRS comes from build/core/pathmap.mk
